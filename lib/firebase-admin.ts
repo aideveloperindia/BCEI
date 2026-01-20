@@ -1,3 +1,4 @@
+import '@opentelemetry/api'
 import admin from 'firebase-admin'
 import { getClientConfig } from '@/config/client-firebase-map'
 
