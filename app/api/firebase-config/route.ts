@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getClientConfig } from '@/config/client-firebase-map'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // Get domain from request headers

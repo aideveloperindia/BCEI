@@ -13,9 +13,9 @@ export interface ClientFirebaseConfig {
 }
 
 export const clientFirebaseMap: Record<string, ClientFirebaseConfig> = {
-  // Client 1 - Example
-  'client1.com': {
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID_CLIENT1 || 'bar-council-client1',
+  // Local development
+  'localhost': {
+    projectId: 'bcei-b4627',
     serviceAccountEnv: 'FIREBASE_SERVICE_ACCOUNT_CLIENT1',
     collectionName: 'fcm_tokens',
     topicName: 'notifications',
@@ -24,9 +24,17 @@ export const clientFirebaseMap: Record<string, ClientFirebaseConfig> = {
       subtitle: 'Stay updated with important election updates',
     },
   },
-  // Add more clients here...
-  // 'client2.com': { ... },
-  // 'client3.com': { ... },
+  // Vercel: add your actual URL (e.g. bcei.vercel.app or your custom domain)
+  'bcei.vercel.app': {
+    projectId: 'bcei-b4627',
+    serviceAccountEnv: 'FIREBASE_SERVICE_ACCOUNT_CLIENT1',
+    collectionName: 'fcm_tokens',
+    topicName: 'notifications',
+    branding: {
+      title: 'Get Bar Council Election Updates',
+      subtitle: 'Stay updated with important election updates',
+    },
+  },
 };
 
 // Get config for current domain

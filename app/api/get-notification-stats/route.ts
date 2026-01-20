@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirestore } from '@/lib/firebase-admin'
 import { getClientConfig } from '@/config/client-firebase-map'
 
+export const dynamic = 'force-dynamic'
+
+interface NotificationLog {
+  id: string
+  sentAt: string | number | Date | undefined
+  success?: boolean
+  subscriberCount?: number
+  title?: string
+  body?: string
+  [key: string]: unknown
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Get domain from request headers
@@ -27,11 +39,14 @@ export async function GET(request: NextRequest) {
       .limit(100) // Get last 100 notifications
       .get()
 
-    const logs = logsSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      sentAt: doc.data().sentAt?.toDate?.() || doc.data().sentAt,
-    }))
+    const logs: NotificationLog[] = logsSnapshot.docs.map((doc) => {
+      const d = doc.data() || {}
+      return {
+        id: doc.id,
+        ...d,
+        sentAt: d.sentAt?.toDate?.() ?? d.sentAt,
+      } as NotificationLog
+    })
 
     // Calculate statistics
     const now = new Date()
@@ -41,13 +56,13 @@ export async function GET(request: NextRequest) {
 
     const totalSent = logs.length
     const sentToday = logs.filter(
-      (log) => new Date(log.sentAt) >= today
+      (log) => new Date(log.sentAt ?? 0) >= today
     ).length
     const sentThisWeek = logs.filter(
-      (log) => new Date(log.sentAt) >= thisWeek
+      (log) => new Date(log.sentAt ?? 0) >= thisWeek
     ).length
     const sentThisMonth = logs.filter(
-      (log) => new Date(log.sentAt) >= thisMonth
+      (log) => new Date(log.sentAt ?? 0) >= thisMonth
     ).length
 
     const successful = logs.filter((log) => log.success === true).length

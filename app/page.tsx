@@ -70,10 +70,10 @@ export default function Home() {
         {isSubscribed ? (
           <div className="text-center space-y-4">
             <div className="text-green-400 text-lg font-medium">
-              ✓ You're subscribed!
+              ✓ You&apos;re subscribed!
             </div>
             <p className="text-white/70 text-sm">
-              You'll receive important election updates
+              You&apos;ll receive important election updates
             </p>
           </div>
         ) : (
