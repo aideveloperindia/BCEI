@@ -5,10 +5,19 @@ import Image from 'next/image'
 import { subscribeToNotifications, setupForegroundNotifications } from '@/lib/notificationManager'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 
+interface NewsItem {
+  id: string
+  title: string
+  body: string
+  createdAt: string
+}
+
 export default function Home() {
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [latestNews, setLatestNews] = useState<NewsItem | null>(null)
+  const [isLoadingNews, setIsLoadingNews] = useState(false)
 
   useEffect(() => {
     // Setup foreground notifications (when tab is open, FCM only triggers onMessage — we show the notification)
@@ -28,6 +37,10 @@ export default function Home() {
         subscribeToNotifications()
           .then((r) => {
             setIsSubscribed(r.success)
+            if (r.success) {
+              // Fetch latest news when subscribed
+              fetchLatestNews()
+            }
             if (!r.success && r.error) {
               console.warn('Auto-subscribe failed:', r.error)
             }
@@ -40,6 +53,22 @@ export default function Home() {
     }
   }, [])
 
+  const fetchLatestNews = async () => {
+    setIsLoadingNews(true)
+    try {
+      const response = await fetch('/api/news')
+      const data = await response.json()
+      if (data.success && data.news && data.news.length > 0) {
+        // Get the latest (first) news item
+        setLatestNews(data.news[0])
+      }
+    } catch (error) {
+      console.error('Error fetching news:', error)
+    } finally {
+      setIsLoadingNews(false)
+    }
+  }
+
   const handleAllowNotifications = async () => {
     setIsLoading(true)
     setError(null)
@@ -50,6 +79,8 @@ export default function Home() {
       if (result.success) {
         setIsSubscribed(true)
         setError(null)
+        // Fetch latest news when user subscribes
+        fetchLatestNews()
       } else {
         // Don't show error to user - just keep loading state and retry silently
         console.error('Subscription failed:', result.error)
@@ -95,15 +126,41 @@ export default function Home() {
           Get Bar Council Election Updates
         </h1>
 
-        {/* Button or Success Message */}
+        {/* Button or News Content (only for subscribed users) */}
         {isSubscribed ? (
-          <div className="text-center space-y-4">
-            <div className="text-green-400 text-lg font-medium">
-              ✓ You&apos;re subscribed!
-            </div>
-            <p className="text-white/70 text-sm">
-              You&apos;ll receive important election updates
-            </p>
+          <div className="w-full space-y-6">
+            {isLoadingNews ? (
+              <div className="text-white/50 text-center py-8">Loading news...</div>
+            ) : latestNews ? (
+              <div className="bg-white/5 border border-white/10 rounded-lg p-6 space-y-4">
+                <div className="text-green-400 text-sm font-medium mb-2">
+                  ✓ You&apos;re subscribed
+                </div>
+                <div className="space-y-3">
+                  <h2 className="text-white text-xl font-semibold">{latestNews.title}</h2>
+                  <div className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">
+                    {latestNews.body}
+                  </div>
+                  {latestNews.createdAt && (
+                    <div className="text-white/40 text-xs pt-2 border-t border-white/10">
+                      {new Date(latestNews.createdAt).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center space-y-4">
+                <div className="text-green-400 text-lg font-medium">
+                  ✓ You&apos;re subscribed!
+                </div>
+                <p className="text-white/70 text-sm">
+                  You&apos;ll receive important election updates
+                </p>
+                <p className="text-white/50 text-xs">
+                  No news updates yet. Check back soon!
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="w-full space-y-2">
