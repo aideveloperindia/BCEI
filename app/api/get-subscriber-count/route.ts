@@ -38,7 +38,14 @@ export async function GET(request: NextRequest) {
       }
     })
     
-    console.log(`get-subscriber-count: Found ${count} valid tokens out of ${snapshot.size} total docs for domain: ${domain}`)
+    console.log(`get-subscriber-count: Found ${count} valid tokens out of ${snapshot.size} total docs for domain: ${domain}, collection: ${config.collectionName}`)
+    
+    // Log all doc IDs for debugging
+    const docIds: string[] = []
+    snapshot.forEach((doc) => {
+      docIds.push(doc.id)
+    })
+    console.log(`get-subscriber-count: Doc IDs: ${docIds.join(', ')}`)
 
     return NextResponse.json({
       success: true,

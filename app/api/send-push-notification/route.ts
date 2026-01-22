@@ -51,20 +51,29 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    console.log(`send-push-notification: Found ${tokens.length} valid tokens out of ${snapshot.size} total docs for domain: ${domain}`)
+    console.log(`send-push-notification: Found ${tokens.length} valid tokens out of ${snapshot.size} total docs for domain: ${domain}, collection: ${config.collectionName}`)
+    console.log(`send-push-notification: Doc IDs with valid tokens: ${docIds.join(', ')}`)
     
-    // If count mismatch, log ALL docs for debugging
+    // Always log all docs for debugging (even if count matches)
+    snapshot.forEach((doc) => {
+      const data = doc.data()
+      const t = data.token
+      const isValid = t && typeof t === 'string' && t.trim().length > 0
+      if (!isValid) {
+        console.warn(`send-push: Doc ${doc.id}: INVALID - type=${typeof t}, token=${t ? t.substring(0, 40) + '...' : 'MISSING'}`)
+      }
+    })
+    
+    // If count mismatch, log error
     if (snapshot.size !== tokens.length) {
       console.error(`CRITICAL: Token count mismatch! ${snapshot.size} docs but only ${tokens.length} valid tokens`)
-      snapshot.forEach((doc) => {
-        const data = doc.data()
-        const t = data.token
-        const isValid = t && typeof t === 'string' && t.trim().length > 0
-        console.error(`  Doc ${doc.id}: valid=${isValid}, type=${typeof t}, token=${t ? t.substring(0, 40) + '...' : 'MISSING'}`)
-      })
     }
 
     const subscriberCount = tokens.length
+    
+    // Log BEFORE sending to see what we're about to send
+    console.log(`send-push-notification: About to send to ${subscriberCount} subscribers (${tokens.length} tokens)`)
+    
     if (subscriberCount === 0) {
       await db.collection('notification_logs').add({
         title,
