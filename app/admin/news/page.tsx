@@ -16,6 +16,7 @@ export default function NewsPage() {
 function NewsContent() {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
   const [newsList, setNewsList] = useState<any[]>([])
@@ -26,16 +27,61 @@ function NewsContent() {
   }, [])
 
   const fetchNews = async () => {
+    setIsLoading(true)
     try {
       const response = await fetch('/api/news')
       const data = await response.json()
+      console.log('Fetched news:', data) // Debug log
       if (data.success) {
         setNewsList(data.news || [])
+        console.log('News list set:', data.news?.length || 0, 'items')
+      } else {
+        console.error('Failed to fetch news:', data.message)
       }
     } catch (error) {
       console.error('Error fetching news:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleEdit = (item: any) => {
+    setTitle(item.title)
+    setBody(item.body)
+    setEditingId(item.id)
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleCancelEdit = () => {
+    setTitle('')
+    setBody('')
+    setEditingId(null)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this news item?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/news/${id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setResult({ success: true, message: 'News deleted successfully!' })
+        fetchNews()
+        if (editingId === id) {
+          handleCancelEdit()
+        }
+      } else {
+        setResult({ success: false, message: data.message || 'Failed to delete news' })
+      }
+    } catch (error) {
+      setResult({ success: false, message: 'Failed to delete news' })
+      console.error('Error deleting news:', error)
     }
   }
 
@@ -45,17 +91,32 @@ function NewsContent() {
     setResult(null)
 
     try {
-      const response = await fetch('/api/news', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, body }),
-      })
+      let response
+      if (editingId) {
+        // Update existing news
+        response = await fetch(`/api/news/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, body }),
+        })
+      } else {
+        // Create new news
+        response = await fetch('/api/news', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, body }),
+        })
+      }
 
       const data = await response.json()
       if (data.success) {
-        setResult({ success: true, message: 'News saved successfully!' })
+        setResult({ 
+          success: true, 
+          message: editingId ? 'News updated successfully!' : 'News saved successfully!' 
+        })
         setTitle('')
         setBody('')
+        setEditingId(null)
         fetchNews()
       } else {
         setResult({ success: false, message: data.message || 'Failed to save news' })
@@ -84,7 +145,9 @@ function NewsContent() {
         </div>
 
         <div className="flex items-center justify-between w-full">
-          <h1 className="text-white text-2xl font-semibold">Add News</h1>
+          <h1 className="text-white text-2xl font-semibold">
+            {editingId ? 'Edit News' : 'Add News'}
+          </h1>
           <Link
             href="/admin/push-notifications"
             className="text-white/70 hover:text-white text-sm underline"
@@ -92,6 +155,12 @@ function NewsContent() {
             Send Push
           </Link>
         </div>
+
+        {editingId && (
+          <div className="w-full bg-blue-500/20 border border-blue-500/30 rounded-lg p-3 text-blue-400 text-sm">
+            Editing news item. Click &quot;Cancel&quot; to stop editing.
+          </div>
+        )}
 
         <form onSubmit={handleSave} className="w-full space-y-4">
           <div>
@@ -120,13 +189,25 @@ function NewsContent() {
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="w-full bg-white text-black font-semibold py-4 px-8 rounded-lg hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSaving ? 'Saving...' : 'Save News'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="flex-1 bg-white text-black font-semibold py-4 px-8 rounded-lg hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? 'Saving...' : editingId ? 'Update News' : 'Save News'}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                disabled={isSaving}
+                className="bg-white/10 text-white font-semibold py-4 px-8 rounded-lg hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
 
         {result && (
@@ -154,8 +235,26 @@ function NewsContent() {
                   key={item.id}
                   className="bg-white/5 border border-white/10 rounded-lg p-4"
                 >
-                  <div className="text-white font-medium text-sm mb-2">{item.title}</div>
-                  <div className="text-white/60 text-xs line-clamp-2 mb-2">{item.body}</div>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="text-white font-medium text-sm flex-1">{item.title}</div>
+                    <div className="flex gap-2 ml-3">
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="text-blue-400 hover:text-blue-300 text-xs underline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="text-red-400 hover:text-red-300 text-xs underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-white/60 text-xs line-clamp-3 mb-2 whitespace-pre-wrap">
+                    {item.body}
+                  </div>
                   <div className="text-white/40 text-xs">
                     {item.createdAt
                       ? new Date(item.createdAt).toLocaleString()
