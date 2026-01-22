@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirestore } from '@/lib/firebase-admin'
 import { getClientConfig } from '@/config/client-firebase-map'
+import { isValidToken, getTokenValidationReason } from '@/lib/token-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,11 +33,11 @@ export async function GET(request: NextRequest) {
     snapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
-      // Only count if token exists, is a string, and is not empty (EXACT same validation as send-push)
-      if (t && typeof t === 'string' && t.trim().length > 0) {
+      // Use centralized validation (same as send-push)
+      if (isValidToken(t)) {
         count++
       } else {
-        const reason = !t ? 'MISSING token field' : typeof t !== 'string' ? `Wrong type: ${typeof t}` : `Empty string (length: ${t.length})`
+        const reason = getTokenValidationReason(t)
         invalidDocs.push({ id: doc.id, reason })
         console.warn(`get-subscriber-count: Skipping invalid token in doc ${doc.id} - ${reason}`)
       }

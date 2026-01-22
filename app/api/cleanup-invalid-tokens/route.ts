@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirestore } from '@/lib/firebase-admin'
 import { getClientConfig } from '@/config/client-firebase-map'
+import { isValidToken } from '@/lib/token-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,8 +37,8 @@ export async function POST(request: NextRequest) {
     snapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
-      // Same validation as count and send-push
-      if (!t || typeof t !== 'string' || t.trim().length === 0) {
+      // Use centralized validation (same as count and send-push)
+      if (!isValidToken(t)) {
         toDelete.push(doc.id)
       }
     })

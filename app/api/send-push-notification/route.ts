@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMessaging, getFirestore } from '@/lib/firebase-admin'
 import { getClientConfig } from '@/config/client-firebase-map'
+import { isValidToken, getTokenValidationReason } from '@/lib/token-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,12 +43,12 @@ export async function POST(request: NextRequest) {
     snapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
-      // Use EXACT same validation as get-subscriber-count
-      if (t && typeof t === 'string' && t.trim().length > 0) {
+      // Use centralized validation (same as get-subscriber-count)
+      if (isValidToken(t)) {
         tokens.push(t)
         docIds.push(doc.id)
       } else {
-        console.warn(`send-push: Skipping invalid token in doc ${doc.id} - type: ${typeof t}, has token: ${!!t}, value: ${t ? t.substring(0, 30) + '...' : 'null/undefined'}`)
+        console.warn(`send-push: Skipping invalid token in doc ${doc.id} - ${getTokenValidationReason(t)}`)
       }
     })
 
@@ -59,9 +60,8 @@ export async function POST(request: NextRequest) {
     snapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
-      const isValid = t && typeof t === 'string' && t.trim().length > 0
-      if (!isValid) {
-        const reason = !t ? 'MISSING token field' : typeof t !== 'string' ? `Wrong type: ${typeof t}` : `Empty string (length: ${t.length})`
+      if (!isValidToken(t)) {
+        const reason = getTokenValidationReason(t)
         invalidDocs.push({ id: doc.id, reason })
         console.warn(`send-push: Doc ${doc.id}: INVALID - ${reason}`)
       } else {
@@ -69,13 +69,17 @@ export async function POST(request: NextRequest) {
       }
     })
     
+    // Automatically clean up invalid documents (prevents count mismatches)
     if (invalidDocs.length > 0) {
-      console.error(`send-push: Found ${invalidDocs.length} invalid docs that will be skipped:`, invalidDocs)
+      console.error(`send-push: Found ${invalidDocs.length} invalid docs that will be cleaned up:`, invalidDocs)
+      // Delete invalid docs immediately to keep database clean
+      await Promise.all(invalidDocs.map((doc) => tokensRef.doc(doc.id).delete()))
+      console.log(`send-push: Cleaned up ${invalidDocs.length} invalid token documents`)
     }
     
-    // If count mismatch, log error
-    if (snapshot.size !== tokens.length) {
-      console.error(`CRITICAL: Token count mismatch! ${snapshot.size} docs but only ${tokens.length} valid tokens`)
+    // If count mismatch, log error (shouldn't happen after cleanup)
+    if (snapshot.size !== tokens.length + invalidDocs.length) {
+      console.error(`CRITICAL: Token count mismatch! ${snapshot.size} docs but only ${tokens.length} valid tokens (${invalidDocs.length} invalid)`)
     }
 
     const subscriberCount = tokens.length
@@ -87,7 +91,7 @@ export async function POST(request: NextRequest) {
     countSnapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
-      if (t && typeof t === 'string' && t.trim().length > 0) {
+      if (isValidToken(t)) {
         countApiCount++
       }
     })

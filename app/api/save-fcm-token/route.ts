@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { getFirestore, getMessaging } from '@/lib/firebase-admin'
+import { getFirestore } from '@/lib/firebase-admin'
 import { getClientConfig } from '@/config/client-firebase-map'
 
 export const dynamic = 'force-dynamic'
@@ -74,16 +74,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Subscribe token to FCM topic (optional, we send per-token anyway)
-    try {
-      const messaging = getMessaging(domain)
-      await messaging.subscribeToTopic([token], config.topicName)
-    } catch (topicError) {
-      console.error('Error subscribing to topic:', topicError)
-      // Continue even if topic subscription fails - we send per-token anyway
-    }
-
-    console.log('Token saved successfully for domain:', domain, 'docId:', docId)
+    // Token is saved and verified - ready for immediate push notifications
+    // We send per-token (not topics) for better reliability and immediate delivery
+    console.log('Token saved successfully for domain:', domain, 'docId:', docId, 'token length:', token.length)
 
     return NextResponse.json({
       success: true,

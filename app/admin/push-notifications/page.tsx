@@ -38,6 +38,21 @@ function PushNotificationsContent() {
   const [showAnalytics, setShowAnalytics] = useState(false)
 
   useEffect(() => {
+    // Clean up invalid tokens on page load (silent, no UI feedback needed)
+    const cleanupInvalidTokens = async () => {
+      try {
+        const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123'
+        await fetch('/api/cleanup-invalid-tokens', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: adminPassword }),
+        }).catch(() => {}) // Silent fail
+      } catch (error) {
+        // Silent - don't show errors to user
+      }
+    }
+    cleanupInvalidTokens()
+
     fetchSubscriberCount()
     fetchStats()
     // Warm serverless + Firebase so first Send is faster
