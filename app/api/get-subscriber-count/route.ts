@@ -29,11 +29,16 @@ export async function GET(request: NextRequest) {
     let count = 0
     snapshot.forEach((doc) => {
       const data = doc.data()
-      // Only count if token exists and is a string
-      if (data.token && typeof data.token === 'string') {
+      const t = data.token
+      // Only count if token exists, is a string, and is not empty (match send-push validation)
+      if (t && typeof t === 'string' && t.trim().length > 0) {
         count++
+      } else {
+        console.warn('get-subscriber-count: Skipping invalid token in doc:', doc.id, 'token type:', typeof t, 'has token:', !!t)
       }
     })
+    
+    console.log(`get-subscriber-count: Found ${count} valid tokens out of ${snapshot.size} total docs for domain: ${domain}`)
 
     return NextResponse.json({
       success: true,

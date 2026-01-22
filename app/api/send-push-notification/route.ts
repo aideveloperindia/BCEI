@@ -38,18 +38,31 @@ export async function POST(request: NextRequest) {
     const snapshot = await tokensRef.get()
     const tokens: string[] = []
     const docIds: string[] = []
+    
     snapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
+      // Use EXACT same validation as get-subscriber-count
       if (t && typeof t === 'string' && t.trim().length > 0) {
         tokens.push(t)
         docIds.push(doc.id)
       } else {
-        console.warn('Skipping invalid token in doc:', doc.id, 'token type:', typeof t)
+        console.warn(`send-push: Skipping invalid token in doc ${doc.id} - type: ${typeof t}, has token: ${!!t}, value: ${t ? t.substring(0, 30) + '...' : 'null/undefined'}`)
       }
     })
 
-    console.log(`Found ${tokens.length} valid tokens out of ${snapshot.size} total docs for domain: ${domain}`)
+    console.log(`send-push-notification: Found ${tokens.length} valid tokens out of ${snapshot.size} total docs for domain: ${domain}`)
+    
+    // If count mismatch, log ALL docs for debugging
+    if (snapshot.size !== tokens.length) {
+      console.error(`CRITICAL: Token count mismatch! ${snapshot.size} docs but only ${tokens.length} valid tokens`)
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        const t = data.token
+        const isValid = t && typeof t === 'string' && t.trim().length > 0
+        console.error(`  Doc ${doc.id}: valid=${isValid}, type=${typeof t}, token=${t ? t.substring(0, 40) + '...' : 'MISSING'}`)
+      })
+    }
 
     const subscriberCount = tokens.length
     if (subscriberCount === 0) {
