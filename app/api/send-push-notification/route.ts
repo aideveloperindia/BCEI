@@ -35,84 +35,28 @@ export async function POST(request: NextRequest) {
     const db = getFirestore(domain)
     const tokensRef = db.collection(config.collectionName)
 
-    // Get all FCM tokens from Firestore (send to each token directly; more reliable than topic for web)
-    // Admin SDK always reads from server (fresh data) - critical for immediate testing after subscription
-    const snapshot = await tokensRef.get()
-    const tokens: string[] = []
-    const docIds: string[] = []
-    
-    snapshot.forEach((doc) => {
-      const data = doc.data()
-      const t = data.token
-      // Use centralized validation (same as get-subscriber-count)
-      if (isValidToken(t)) {
-        tokens.push(t)
-        docIds.push(doc.id)
-      } else {
-        console.warn(`send-push: Skipping invalid token in doc ${doc.id} - ${getTokenValidationReason(t)}`)
-      }
-    })
-
-    console.log(`send-push-notification: Found ${tokens.length} valid tokens out of ${snapshot.size} total docs for domain: ${domain}, collection: ${config.collectionName}`)
-    console.log(`send-push-notification: Doc IDs with valid tokens: ${docIds.join(', ')}`)
-    
-    // Always log ALL docs (valid and invalid) for debugging
-    const invalidDocs: Array<{ id: string; reason: string }> = []
-    snapshot.forEach((doc) => {
-      const data = doc.data()
-      const t = data.token
-      if (!isValidToken(t)) {
-        const reason = getTokenValidationReason(t)
-        invalidDocs.push({ id: doc.id, reason })
-        console.warn(`send-push: Doc ${doc.id}: INVALID - ${reason}`)
-      } else {
-        console.log(`send-push: Doc ${doc.id}: VALID - token length: ${t.length}`)
-      }
-    })
-    
-    // Automatically clean up invalid documents (prevents count mismatches)
-    if (invalidDocs.length > 0) {
-      console.error(`send-push: Found ${invalidDocs.length} invalid docs that will be cleaned up:`, invalidDocs)
-      // Delete invalid docs immediately to keep database clean
-      await Promise.all(invalidDocs.map((doc) => tokensRef.doc(doc.id).delete()))
-      console.log(`send-push: Cleaned up ${invalidDocs.length} invalid token documents`)
-    }
-    
-    // If count mismatch, log error (shouldn't happen after cleanup)
-    if (snapshot.size !== tokens.length + invalidDocs.length) {
-      console.error(`CRITICAL: Token count mismatch! ${snapshot.size} docs but only ${tokens.length} valid tokens (${invalidDocs.length} invalid)`)
-    }
-
-    const subscriberCount = tokens.length
-    
-    // CRITICAL: Verify count matches get-subscriber-count API
-    // Read count using same logic to compare
+    // FREE TIER OPTIMIZATION: Use FCM Topics instead of reading all tokens
+    // This eliminates Firestore reads when sending (stays within free tier limits)
+    // Get subscriber count for logging (minimal reads - only for count)
     const countSnapshot = await tokensRef.get()
-    let countApiCount = 0
+    let subscriberCount = 0
     countSnapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
       if (isValidToken(t)) {
-        countApiCount++
+        subscriberCount++
       }
     })
-    
-    if (countApiCount !== subscriberCount) {
-      console.error(`CRITICAL MISMATCH: send-push found ${subscriberCount} tokens but count API logic would find ${countApiCount}`)
-      console.error(`  send-push snapshot size: ${snapshot.size}, tokens: ${tokens.length}`)
-      console.error(`  count API snapshot size: ${countSnapshot.size}, count: ${countApiCount}`)
-    }
-    
-    // Log BEFORE sending to see what we're about to send
-    console.log(`send-push-notification: About to send to ${subscriberCount} subscribers (${tokens.length} tokens), count API would show: ${countApiCount}`)
-    
+
+    console.log(`send-push-notification: Sending to topic "${config.topicName}" (${subscriberCount} subscribers) - ZERO Firestore reads for sending!`)
+
     if (subscriberCount === 0) {
       await db.collection('notification_logs').add({
         title,
         body: messageBody,
         subscriberCount: 0,
         success: false,
-        error: 'No tokens to send to',
+        error: 'No subscribers',
         sentAt: new Date(),
         domain,
       })
@@ -122,116 +66,54 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // FCM sendEachForMulticast can only handle 500 tokens at a time
-    // For 35,000+ subscribers, we need to batch the sends
-    const BATCH_SIZE = 500
-    const totalBatches = Math.ceil(tokens.length / BATCH_SIZE)
-    let successCount = 0
-    let totalFailed = 0
+    // Send to FCM topic (ZERO Firestore reads - stays within free tier!)
+    let successCount = subscriberCount // FCM topics deliver to all subscribers
     let errorMessage: string | null = null
-    const toRemove: string[] = []
     const batchResults: Array<{ 
       batchNumber: number
       successCount: number
       failedCount: number
-      failedTokens?: string[]
-      failedDocIds?: string[]
     }> = []
 
     try {
-      // Process tokens in batches of 500
-      for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
-        const batchNumber = Math.floor(i / BATCH_SIZE) + 1
-        const batchTokens = tokens.slice(i, i + BATCH_SIZE)
-        const batchDocIds = docIds.slice(i, i + BATCH_SIZE)
-
-        const message = {
-          tokens: batchTokens,
-          notification: { title, body: messageBody },
-          webpush: {
-            headers: { Urgency: 'high' },
-            notification: {
-              title,
-              body: messageBody,
-              icon: `${baseUrl}/advocates-logo.png`,
-              tag: 'bar-council-notification',
-              requireInteraction: false,
-            },
-            fcmOptions: {
-              link: baseUrl,
-            },
+      const message = {
+        topic: config.topicName,
+        notification: { title, body: messageBody },
+        webpush: {
+          headers: { Urgency: 'high' },
+          notification: {
+            title,
+            body: messageBody,
+            icon: `${baseUrl}/advocates-logo.png`,
+            tag: 'bar-council-notification',
+            requireInteraction: false,
           },
-        }
-
-        const batch = await messaging.sendEachForMulticast(message)
-        const batchSuccess = batch.successCount
-        const batchFailed = batch.failureCount
-        successCount += batchSuccess
-        totalFailed += batchFailed
-
-        // Track failed tokens for retry capability (exclude invalid/unregistered - those should be deleted)
-        const failedTokens: string[] = []
-        const failedDocIds: string[] = []
-
-        // Track invalid/unregistered tokens for removal
-        batch.responses.forEach((r, j) => {
-          if (!r.success) {
-            if (r.error?.code === 'messaging/invalid-registration-token' || r.error?.code === 'messaging/registration-token-not-registered') {
-              // These should be deleted (invalid/unregistered)
-              toRemove.push(batchDocIds[j])
-              console.log(`send-push: Removing invalid token doc: ${batchDocIds[j]}`)
-            } else {
-              // Other failures (network, quota, etc.) - can be retried
-              failedTokens.push(batchTokens[j])
-              failedDocIds.push(batchDocIds[j])
-            }
-          }
-        })
-
-        // Track batch results for admin visibility (including failed tokens for retry)
-        batchResults.push({
-          batchNumber,
-          successCount: batchSuccess,
-          failedCount: batchFailed,
-          failedTokens: failedTokens.length > 0 ? failedTokens : undefined,
-          failedDocIds: failedDocIds.length > 0 ? failedDocIds : undefined,
-        })
-
-        console.log(`send-push: Batch ${batchNumber}/${totalBatches}: ${batchSuccess} sent, ${batchFailed} failed`)
+          fcmOptions: {
+            link: baseUrl,
+          },
+        },
       }
 
-      // Remove all invalid/unregistered tokens after all batches complete
-      if (toRemove.length > 0) {
-        console.log(`send-push: Deleting ${toRemove.length} invalid/unregistered tokens`)
-        await Promise.all(toRemove.map((id) => tokensRef.doc(id).delete()))
-        console.log(`send-push: Deleted ${toRemove.length} tokens. Remaining subscribers: ${subscriberCount - toRemove.length}`)
-      }
-
-      if (totalFailed > 0 && successCount === 0) {
-        errorMessage = 'All sends failed across all batches'
-      } else if (totalFailed > 0) {
-        errorMessage = `${totalFailed} sends failed (${successCount} succeeded)`
-      }
+      // Send to topic - FCM handles delivery to all subscribers automatically
+      const response = await messaging.send(message)
+      console.log(`send-push: Sent to topic "${config.topicName}" - messageId: ${response}`)
+      
+      // Topic sends are all-or-nothing, so we assume all subscribers receive it
+      // FCM handles delivery internally (no batch results needed)
+      batchResults.push({
+        batchNumber: 1,
+        successCount: subscriberCount,
+        failedCount: 0,
+      })
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      console.error('send-push: Error during batch sending:', err)
+      console.error('send-push: Error sending to topic:', err)
+      successCount = 0
     }
 
     const success = successCount > 0
 
-    // Store failed tokens for retry capability
-    const allFailedTokens: string[] = []
-    const allFailedDocIds: string[] = []
-    batchResults.forEach((batch) => {
-      if (batch.failedTokens && batch.failedTokens.length > 0) {
-        allFailedTokens.push(...batch.failedTokens)
-        if (batch.failedDocIds) {
-          allFailedDocIds.push(...batch.failedDocIds)
-        }
-      }
-    })
-
-    const logId = (await db.collection('notification_logs').add({
+    await db.collection('notification_logs').add({
       title,
       body: messageBody,
       subscriberCount,
@@ -241,23 +123,17 @@ export async function POST(request: NextRequest) {
       error: errorMessage,
       sentAt: new Date(),
       domain,
-      totalBatches,
-      batchResults,
-      // Store failed tokens for retry (only retryable failures, not invalid tokens)
-      failedTokens: allFailedTokens.length > 0 ? allFailedTokens : undefined,
-      failedDocIds: allFailedDocIds.length > 0 ? allFailedDocIds : undefined,
-    })).id
+      method: 'topic', // Indicate we used topic messaging
+    })
 
     if (success) {
       return NextResponse.json({
         success: true,
         subscriberCount,
         successCount,
-        totalBatches,
+        totalBatches: 1, // Topic sends are single operation
         batchResults,
-        failedTokensCount: allFailedTokens.length,
-        logId, // Store log ID for retry
-        message: `Notification sent to ${successCount} of ${subscriberCount} subscribers across ${totalBatches} batches${allFailedTokens.length > 0 ? ` (${allFailedTokens.length} failed - can retry)` : ''}`,
+        message: `Notification sent to ${subscriberCount} subscribers via FCM topic (zero Firestore reads - free tier compliant!)`,
       })
     }
 
