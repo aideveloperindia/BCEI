@@ -130,7 +130,13 @@ export async function POST(request: NextRequest) {
     let totalFailed = 0
     let errorMessage: string | null = null
     const toRemove: string[] = []
-    const batchResults: Array<{ batchNumber: number; successCount: number; failedCount: number }> = []
+    const batchResults: Array<{ 
+      batchNumber: number
+      successCount: number
+      failedCount: number
+      failedTokens?: string[]
+      failedDocIds?: string[]
+    }> = []
 
     try {
       // Process tokens in batches of 500
