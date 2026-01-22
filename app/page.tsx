@@ -30,27 +30,66 @@ export default function Home() {
       }
     })
 
-    // If permission already granted, ensure we have a token saved (fixes "0 subscribers")
-    // Wait a bit for service worker to be ready
-    if ('Notification' in window && Notification.permission === 'granted') {
-      setTimeout(() => {
-        subscribeToNotifications()
-          .then((r) => {
-            setIsSubscribed(r.success)
-            if (r.success) {
-              // Fetch latest news when subscribed
-              fetchLatestNews()
+    // Check subscription status immediately on page load (no delay)
+    const checkSubscriptionStatus = async () => {
+      // Check if permission is granted first
+      if ('Notification' in window && Notification.permission === 'granted') {
+        // Try to get FCM token immediately
+        try {
+          const { getFCMToken } = await import('@/lib/firebase-client')
+          
+          // Wait for service worker (but with timeout)
+          let swReady = false
+          for (let i = 0; i < 10; i++) {
+            const registration = await navigator.serviceWorker.getRegistration()
+            if (registration && registration.active) {
+              swReady = true
+              break
             }
-            if (!r.success && r.error) {
-              console.warn('Auto-subscribe failed:', r.error)
+            await new Promise((r) => setTimeout(r, 200))
+          }
+
+          if (swReady) {
+            const token = await getFCMToken()
+            if (token) {
+              // Verify token exists in Firestore
+              const response = await fetch('/api/check-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token }),
+              })
+              const data = await response.json()
+              if (data.success && data.isSubscribed) {
+                setIsSubscribed(true)
+                fetchLatestNews()
+                return
+              }
             }
-          })
-          .catch((err) => {
-            console.error('Auto-subscribe error:', err)
-            setIsSubscribed(false)
-          })
-      }, 2000) // Wait 2s for service worker to initialize
+          }
+
+          // If token check failed, try full subscription (ensures token is saved)
+          const result = await subscribeToNotifications()
+          if (result.success) {
+            setIsSubscribed(true)
+            fetchLatestNews()
+          }
+        } catch (error) {
+          console.error('Error checking subscription:', error)
+          // Fallback: try subscription
+          subscribeToNotifications()
+            .then((r) => {
+              if (r.success) {
+                setIsSubscribed(true)
+                fetchLatestNews()
+              }
+            })
+            .catch(() => {})
+        }
+      }
     }
+
+    // Check immediately (no delay)
+    checkSubscriptionStatus()
   }, [])
 
   const fetchLatestNews = async () => {
@@ -58,12 +97,18 @@ export default function Home() {
     try {
       const response = await fetch('/api/news')
       const data = await response.json()
-      if (data.success && data.news && data.news.length > 0) {
+      console.log('News API response:', data) // Debug log
+      if (data.success && data.news && Array.isArray(data.news) && data.news.length > 0) {
         // Get the latest (first) news item
         setLatestNews(data.news[0])
+        console.log('Latest news set:', data.news[0]) // Debug log
+      } else {
+        console.log('No news found or empty array:', data) // Debug log
+        setLatestNews(null)
       }
     } catch (error) {
       console.error('Error fetching news:', error)
+      setLatestNews(null)
     } finally {
       setIsLoadingNews(false)
     }

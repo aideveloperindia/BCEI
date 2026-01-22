@@ -19,21 +19,44 @@ export async function GET(request: NextRequest) {
     const db = getFirestore(domain)
     const newsRef = db.collection('news')
 
-    const snapshot = await newsRef
+    // Get all news for domain (without orderBy to avoid index requirement)
+    // Then sort in memory by createdAt
+    const allSnapshot = await newsRef
       .where('domain', '==', domain)
-      .orderBy('createdAt', 'desc')
-      .limit(50)
       .get()
 
-    const news = snapshot.docs.map((doc) => {
+    // Convert to array and sort by createdAt (newest first)
+    const allNews = allSnapshot.docs.map((doc) => {
       const d = doc.data()
+      const createdAt = d.createdAt?.toDate?.() ?? d.createdAt
       return {
         id: doc.id,
         title: d.title,
         body: d.body,
-        createdAt: d.createdAt?.toDate?.()?.toISOString() ?? d.createdAt,
+        createdAt: createdAt instanceof Date ? createdAt.toISOString() : (typeof createdAt === 'string' ? createdAt : new Date().toISOString()),
+        createdAtRaw: createdAt,
       }
     })
+
+    // Sort by createdAt descending (newest first)
+    allNews.sort((a, b) => {
+      const aTime = a.createdAtRaw instanceof Date ? a.createdAtRaw.getTime() : (new Date(a.createdAt).getTime() || 0)
+      const bTime = b.createdAtRaw instanceof Date ? b.createdAtRaw.getTime() : (new Date(b.createdAt).getTime() || 0)
+      return bTime - aTime
+    })
+
+    // Take latest 50
+    const news = allNews.slice(0, 50).map((item) => ({
+      id: item.id,
+      title: item.title,
+      body: item.body,
+      createdAt: item.createdAt,
+    }))
+
+    console.log(`News API: Found ${news.length} news items for domain: ${domain}`)
+    if (news.length === 0) {
+      console.log('No news found - checking if collection exists and has documents')
+    }
 
     return NextResponse.json({ success: true, news })
   } catch (error) {
