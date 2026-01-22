@@ -38,23 +38,27 @@ export async function POST(request: NextRequest) {
     const db = getFirestore(domain)
     const collection = db.collection(config.collectionName)
 
-    // Save token to Firestore (use hashed doc ID to avoid invalid chars, prevent duplicates by token)
-    // Use set() with merge: false to ensure immediate write (not just update)
-    // Add retry logic for quota errors (critical for 35,000 concurrent users)
+    // Save token to Firestore using batch write (more efficient, stays under rate limits)
+    // Firestore batch writes are more efficient and handle rate limiting better
+    // Even for single writes, using batch API is recommended for high concurrency
     let retries = 0
     const maxRetries = 5
     let lastError: Error | null = null
 
     while (retries < maxRetries) {
       try {
-        await collection.doc(docId).set(
-          {
-            token,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          { merge: false }
-        )
+        // Use batch write (even for single operation) - more efficient under load
+        const batch = db.batch()
+        const docRef = collection.doc(docId)
+        const now = new Date()
+        
+        batch.set(docRef, {
+          token,
+          createdAt: now,
+          updatedAt: now,
+        }, { merge: false })
+        
+        await batch.commit()
         lastError = null
         break // Success, exit retry loop
       } catch (error) {
