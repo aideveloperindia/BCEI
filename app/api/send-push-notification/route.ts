@@ -6,11 +6,11 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    // Get domain from request headers
     const host = request.headers.get('host') || ''
     const domain = host.split(':')[0]
+    const protocol = host.includes('localhost') ? 'http' : 'https'
+    const baseUrl = `${protocol}://${domain}`
 
-    // Get client config
     const config = getClientConfig(domain)
     if (!config) {
       return NextResponse.json(
@@ -19,9 +19,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get request body
     const body = await request.json()
-    const { title, body: messageBody, clientId } = body
+    const { title, body: messageBody } = body
 
     if (!title || !messageBody) {
       return NextResponse.json(
@@ -30,79 +29,117 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use clientId if provided, otherwise use domain-based topic
-    const topicName = clientId ? `${clientId}_notifications` : config.topicName
-
-    // Get messaging instance
     const messaging = getMessaging(domain)
     const db = getFirestore(domain)
+    const tokensRef = db.collection(config.collectionName)
 
-    // Get subscriber count before sending
-    const subscriberCountSnapshot = await db.collection(config.collectionName).count().get()
-    const subscriberCount = subscriberCountSnapshot.data().count
+    // Get all FCM tokens from Firestore (send to each token directly; more reliable than topic for web)
+    // Admin SDK always reads from server (fresh data) - critical for immediate testing after subscription
+    const snapshot = await tokensRef.get()
+    const tokens: string[] = []
+    const docIds: string[] = []
+    snapshot.forEach((doc) => {
+      const data = doc.data()
+      const t = data.token
+      if (t && typeof t === 'string' && t.trim().length > 0) {
+        tokens.push(t)
+        docIds.push(doc.id)
+      } else {
+        console.warn('Skipping invalid token in doc:', doc.id, 'token type:', typeof t)
+      }
+    })
 
-    // Send notification to topic
-    const message = {
-      topic: topicName,
-      notification: {
+    console.log(`Found ${tokens.length} valid tokens out of ${snapshot.size} total docs for domain: ${domain}`)
+
+    const subscriberCount = tokens.length
+    if (subscriberCount === 0) {
+      await db.collection('notification_logs').add({
         title,
         body: messageBody,
-      },
+        subscriberCount: 0,
+        success: false,
+        error: 'No tokens to send to',
+        sentAt: new Date(),
+        domain,
+      })
+      return NextResponse.json({
+        success: false,
+        message: 'No subscribers. Ask users to allow notifications on the site first.',
+      })
+    }
+
+    const message = {
+      tokens,
+      notification: { title, body: messageBody },
       webpush: {
+        headers: { Urgency: 'high' },
         notification: {
           title,
           body: messageBody,
+          icon: `${baseUrl}/advocates-logo.png`,
+          tag: 'bar-council-notification',
+          requireInteraction: false,
         },
         fcmOptions: {
-          link: '/',
+          link: baseUrl,
         },
       },
     }
 
-    let messageId: string | null = null
-    let success = false
+    let successCount = 0
     let errorMessage: string | null = null
 
     try {
-      const response = await messaging.send(message)
-      messageId = response
-      success = true
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      success = false
+      const batch = await messaging.sendEachForMulticast(message)
+      successCount = batch.successCount
+
+      // Remove invalid/unregistered tokens from Firestore
+      const toRemove: string[] = []
+      batch.responses.forEach((r, i) => {
+        if (!r.success && r.error?.code === 'messaging/invalid-registration-token') toRemove.push(docIds[i])
+        if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') toRemove.push(docIds[i])
+      })
+      if (toRemove.length > 0) {
+        await Promise.all(toRemove.map((id) => tokensRef.doc(id).delete()))
+      }
+
+      if (batch.failureCount > 0 && successCount === 0) {
+        errorMessage = batch.responses.find((r) => !r.success)?.error?.message ?? 'All sends failed'
+      }
+    } catch (err) {
+      errorMessage = err instanceof Error ? err.message : 'Unknown error'
     }
 
-    // Log notification to Firestore for analytics
-    const notificationLog = {
+    const success = successCount > 0
+
+    await db.collection('notification_logs').add({
       title,
       body: messageBody,
-      topic: topicName,
       subscriberCount,
       success,
-      messageId,
+      successCount,
+      failedCount: subscriberCount - successCount,
       error: errorMessage,
       sentAt: new Date(),
       domain,
-    }
-
-    await db.collection('notification_logs').add(notificationLog)
+    })
 
     if (success) {
       return NextResponse.json({
         success: true,
-        messageId,
         subscriberCount,
-        message: `Notification sent successfully to ${subscriberCount} subscribers`,
+        successCount,
+        message: `Notification sent to ${successCount} of ${subscriberCount} subscribers`,
       })
-    } else {
-      return NextResponse.json(
-        {
-          success: false,
-          message: errorMessage || 'Failed to send notification',
-        },
-        { status: 500 }
-      )
     }
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: errorMessage || `Failed to deliver to all ${subscriberCount} subscribers`,
+      },
+      { status: 500 }
+    )
   } catch (error) {
     console.error('Error sending push notification:', error)
     return NextResponse.json(

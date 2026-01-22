@@ -13,8 +13,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim()) // Take control of all pages
 })
 
-// Fetch config and initialize Firebase
-fetch('/api/firebase-config')
+// Fetch config and initialize Firebase (no cache so we get fresh config)
+fetch('/api/firebase-config', { cache: 'no-store' })
   .then((response) => response.json())
   .then((data) => {
     if (!data.success || !data.config) {

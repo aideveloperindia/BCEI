@@ -24,7 +24,7 @@ export const clientFirebaseMap: Record<string, ClientFirebaseConfig> = {
       subtitle: 'Stay updated with important election updates',
     },
   },
-  // Vercel: add your actual URL (e.g. bcei.vercel.app or your custom domain)
+  // Production: https://bcei.vercel.app
   'bcei.vercel.app': {
     projectId: 'bcei-b4627',
     serviceAccountEnv: 'FIREBASE_SERVICE_ACCOUNT_CLIENT1',

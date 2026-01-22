@@ -23,9 +23,17 @@ export async function GET(request: NextRequest) {
     const db = getFirestore(domain)
     const collection = db.collection(config.collectionName)
 
-    // Get count using count query (efficient)
-    const countSnapshot = await collection.count().get()
-    const count = countSnapshot.data().count
+    // Read all documents and count (more reliable than count query)
+    // Admin SDK always reads fresh from server - ensures immediate count after subscription
+    const snapshot = await collection.get()
+    let count = 0
+    snapshot.forEach((doc) => {
+      const data = doc.data()
+      // Only count if token exists and is a string
+      if (data.token && typeof data.token === 'string') {
+        count++
+      }
+    })
 
     return NextResponse.json({
       success: true,

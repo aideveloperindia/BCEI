@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { AdminProtection } from '@/components/AdminProtection'
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default function PushNotificationsPage() {
   return (
@@ -37,10 +38,17 @@ function PushNotificationsContent() {
   const [showAnalytics, setShowAnalytics] = useState(false)
 
   useEffect(() => {
-    // Fetch subscriber count
     fetchSubscriberCount()
-    // Fetch stats
     fetchStats()
+    // Warm serverless + Firebase so first Send is faster
+    fetch('/api/warm').catch(() => {})
+
+    // Refresh subscriber count every 5 seconds (real-time updates)
+    const interval = setInterval(() => {
+      fetchSubscriberCount()
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const fetchSubscriberCount = async () => {
@@ -86,27 +94,28 @@ function PushNotificationsContent() {
         }),
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
+      const ok = response.ok && data?.success
 
-      if (data.success) {
+      if (ok) {
+        const n = data.subscriberCount ?? 0
         setResult({
           success: true,
-          message: data.message || 'Notification sent successfully!',
+          message: n ? `Sent to ${n} subscriber${n === 1 ? '' : 's'}.` : 'Sent.',
           subscriberCount: data.subscriberCount,
         })
-        // Refresh subscriber count and stats
         fetchSubscriberCount()
         fetchStats()
       } else {
         setResult({
           success: false,
-          message: data.message || 'Failed to send notification',
+          message: data?.message || (response.ok ? 'Failed to send' : `Request failed (${response.status}). Try again.`),
         })
       }
     } catch (error) {
       setResult({
         success: false,
-        message: 'Failed to send notification',
+        message: 'Request failed or timed out. Try again—the next attempt is often faster.',
       })
       console.error('Error sending notification:', error)
     } finally {
@@ -135,12 +144,20 @@ function PushNotificationsContent() {
           <h1 className="text-white text-2xl font-semibold">
             Send Push Notification
           </h1>
-          <button
-            onClick={() => setShowAnalytics(!showAnalytics)}
-            className="text-white/70 hover:text-white text-sm underline"
-          >
-            {showAnalytics ? 'Hide Analytics' : 'Show Analytics'}
-          </button>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/admin/news"
+              className="text-white/70 hover:text-white text-sm underline"
+            >
+              News
+            </Link>
+            <button
+              onClick={() => setShowAnalytics(!showAnalytics)}
+              className="text-white/70 hover:text-white text-sm underline"
+            >
+              {showAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </button>
+          </div>
         </div>
 
         {/* Analytics Section */}
@@ -278,13 +295,9 @@ function PushNotificationsContent() {
             }`}
           >
             <div className="font-semibold">{result.message}</div>
-            {result.success && result.subscriberCount !== undefined && (
-              <div className="text-sm mt-2 opacity-80">
-                Sent to {result.subscriberCount.toLocaleString()} subscribers
-              </div>
-            )}
           </div>
         )}
+        <p className="text-white/50 text-xs text-center">First send after opening this page may take 10–15 seconds.</p>
       </div>
     </main>
   )

@@ -73,8 +73,17 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
 export async function getFCMToken(): Promise<string | null> {
   try {
+    // Check if service worker is available
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+      console.error('Service worker not available')
+      return null
+    }
+
     const messaging = await getFirebaseMessaging()
-    if (!messaging) return null
+    if (!messaging) {
+      console.error('Firebase messaging not available')
+      return null
+    }
 
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
     if (!vapidKey) {
@@ -82,10 +91,21 @@ export async function getFCMToken(): Promise<string | null> {
       return null
     }
 
-    const token = await getToken(messaging, { vapidKey })
+    // Check if service worker registration exists
+    const registration = await navigator.serviceWorker.getRegistration()
+    if (!registration) {
+      console.error('Service worker not registered')
+      return null
+    }
+
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration })
     return token || null
   } catch (error) {
     console.error('Error getting FCM token:', error)
+    // Log more details for debugging
+    if (error instanceof Error) {
+      console.error('FCM token error details:', error.message, error.name)
+    }
     return null
   }
 }

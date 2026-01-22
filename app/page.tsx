@@ -11,17 +11,33 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Register service worker
-    // Check if already subscribed
-    if ('Notification' in window && Notification.permission === 'granted') {
-      setIsSubscribed(true)
-    }
-
-    // Setup foreground notifications
+    // Setup foreground notifications (when tab is open, FCM only triggers onMessage — we show the notification)
     setupForegroundNotifications((payload) => {
-      console.log('Foreground notification received:', payload)
-      // You can show a custom notification UI here if needed
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(payload?.notification?.title || 'Bar Council Update', {
+          body: payload?.notification?.body,
+          icon: '/advocates-logo.png',
+        })
+      }
     })
+
+    // If permission already granted, ensure we have a token saved (fixes "0 subscribers")
+    // Wait a bit for service worker to be ready
+    if ('Notification' in window && Notification.permission === 'granted') {
+      setTimeout(() => {
+        subscribeToNotifications()
+          .then((r) => {
+            setIsSubscribed(r.success)
+            if (!r.success && r.error) {
+              console.warn('Auto-subscribe failed:', r.error)
+            }
+          })
+          .catch((err) => {
+            console.error('Auto-subscribe error:', err)
+            setIsSubscribed(false)
+          })
+      }, 2000) // Wait 2s for service worker to initialize
+    }
   }, [])
 
   const handleAllowNotifications = async () => {
@@ -33,12 +49,25 @@ export default function Home() {
 
       if (result.success) {
         setIsSubscribed(true)
+        setError(null)
       } else {
-        setError(result.error || 'Failed to enable notifications')
+        // Don't show error to user - just keep loading state and retry silently
+        console.error('Subscription failed:', result.error)
+        // Retry once after a delay
+        await new Promise((r) => setTimeout(r, 2000))
+        const retryResult = await subscribeToNotifications()
+        if (retryResult.success) {
+          setIsSubscribed(true)
+        } else {
+          // Still failed - show friendly message, not error
+          setIsSubscribed(false)
+          console.error('Retry also failed:', retryResult.error)
+        }
       }
     } catch (err) {
-      setError('Failed to enable notifications')
+      // Don't show error - just log it
       console.error('Error subscribing to notifications:', err)
+      setIsSubscribed(false)
     } finally {
       setIsLoading(false)
     }
@@ -77,18 +106,20 @@ export default function Home() {
             </p>
           </div>
         ) : (
-          <button
-            onClick={handleAllowNotifications}
-            disabled={isLoading}
-            className="w-full bg-white text-black font-semibold py-4 px-8 rounded-lg hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-          >
-            {isLoading ? 'Loading...' : 'Allow Notifications'}
-          </button>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="text-red-400 text-sm text-center">{error}</div>
+          <div className="w-full space-y-2">
+            <button
+              onClick={handleAllowNotifications}
+              disabled={isLoading}
+              className="w-full bg-white text-black font-semibold py-4 px-8 rounded-lg hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+            >
+              {isLoading ? 'Setting up notifications...' : 'Allow Notifications'}
+            </button>
+            {isLoading && (
+              <p className="text-white/50 text-xs text-center">
+                Please wait, this may take a few seconds...
+              </p>
+            )}
+          </div>
         )}
       </div>
     </main>

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirestore, getMessaging } from '@/lib/firebase-admin'
 import { getClientConfig } from '@/config/client-firebase-map'
@@ -30,28 +31,59 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Safe doc ID (tokens can contain /, +, = which are invalid in Firestore doc IDs)
+    const docId = createHash('sha256').update(token).digest('hex')
+
     // Get Firestore instance
     const db = getFirestore(domain)
     const collection = db.collection(config.collectionName)
 
-    // Save token to Firestore (use token as document ID to prevent duplicates)
-    await collection.doc(token).set(
+    // Save token to Firestore (use hashed doc ID to avoid invalid chars, prevent duplicates by token)
+    // Use set() with merge: false to ensure immediate write (not just update)
+    await collection.doc(docId).set(
       {
         token,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-      { merge: true }
+      { merge: false }
     )
 
-    // Subscribe token to FCM topic
+    // Verify token was saved and is readable immediately (critical for immediate push testing)
+    let savedDoc = await collection.doc(docId).get()
+    if (!savedDoc.exists) {
+      // Retry verification once (Firestore eventual consistency edge case)
+      await new Promise((r) => setTimeout(r, 100))
+      savedDoc = await collection.doc(docId).get()
+      if (!savedDoc.exists) {
+        console.error('Token save verification failed for docId:', docId)
+        return NextResponse.json(
+          { success: false, message: 'Failed to save token' },
+          { status: 500 }
+        )
+      }
+    }
+
+    // Double-check token matches
+    const savedToken = savedDoc.data()?.token
+    if (savedToken !== token) {
+      console.error('Token mismatch after save. Expected:', token, 'Got:', savedToken)
+      return NextResponse.json(
+        { success: false, message: 'Token verification failed' },
+        { status: 500 }
+      )
+    }
+
+    // Subscribe token to FCM topic (optional, we send per-token anyway)
     try {
       const messaging = getMessaging(domain)
       await messaging.subscribeToTopic([token], config.topicName)
     } catch (topicError) {
       console.error('Error subscribing to topic:', topicError)
-      // Continue even if topic subscription fails
+      // Continue even if topic subscription fails - we send per-token anyway
     }
+
+    console.log('Token saved successfully for domain:', domain, 'docId:', docId)
 
     return NextResponse.json({
       success: true,
