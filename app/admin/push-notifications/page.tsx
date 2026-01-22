@@ -23,6 +23,13 @@ function PushNotificationsContent() {
     success: boolean
     message: string
     subscriberCount?: number
+    totalBatches?: number
+    batchResults?: Array<{ batchNumber: number; successCount: number; failedCount: number }>
+  } | null>(null)
+  const [sendingProgress, setSendingProgress] = useState<{
+    isSending: boolean
+    totalBatches?: number
+    message?: string
   } | null>(null)
   const [stats, setStats] = useState<{
     totalSent: number
@@ -95,6 +102,16 @@ function PushNotificationsContent() {
     e.preventDefault()
     setIsSending(true)
     setResult(null)
+    
+    // Show progress message if we have subscriber count
+    if (subscriberCount && subscriberCount > 0) {
+      const estimatedBatches = Math.ceil(subscriberCount / 500)
+      setSendingProgress({
+        isSending: true,
+        totalBatches: estimatedBatches,
+        message: `Sending to ${subscriberCount.toLocaleString()} subscribers in ${estimatedBatches} batches...`,
+      })
+    }
 
     try {
       const response = await fetch('/api/send-push-notification', {
@@ -116,8 +133,10 @@ function PushNotificationsContent() {
         const n = data.subscriberCount ?? 0
         setResult({
           success: true,
-          message: n ? `Sent to ${n} subscriber${n === 1 ? '' : 's'}.` : 'Sent.',
+          message: n ? `Sent to ${n.toLocaleString()} subscriber${n === 1 ? '' : 's'}.` : 'Sent.',
           subscriberCount: data.subscriberCount,
+          totalBatches: data.totalBatches,
+          batchResults: data.batchResults,
         })
         fetchSubscriberCount()
         fetchStats()
@@ -135,6 +154,7 @@ function PushNotificationsContent() {
       console.error('Error sending notification:', error)
     } finally {
       setIsSending(false)
+      setSendingProgress(null)
     }
   }
 
@@ -300,6 +320,23 @@ function PushNotificationsContent() {
           </button>
         </form>
 
+        {/* Sending Progress */}
+        {sendingProgress && sendingProgress.isSending && (
+          <div className="w-full bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
+            <div className="text-blue-400 font-semibold text-center mb-2">
+              {sendingProgress.message || 'Sending notifications...'}
+            </div>
+            {sendingProgress.totalBatches && (
+              <div className="text-blue-300 text-sm text-center">
+                Processing {sendingProgress.totalBatches} batches (this may take 2-3 minutes for large subscriber counts)
+              </div>
+            )}
+            <div className="mt-3 w-full bg-white/10 rounded-full h-2">
+              <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+            </div>
+          </div>
+        )}
+
         {/* Result */}
         {result && (
           <div
@@ -309,7 +346,24 @@ function PushNotificationsContent() {
                 : 'bg-red-500/20 text-red-400'
             }`}
           >
-            <div className="font-semibold">{result.message}</div>
+            <div className="font-semibold mb-2">{result.message}</div>
+            {result.success && result.totalBatches && result.batchResults && (
+              <div className="mt-3 text-sm text-left bg-white/5 rounded-lg p-3 max-h-60 overflow-y-auto">
+                <div className="text-white/70 mb-2 font-semibold">
+                  Batch Details ({result.totalBatches} batches completed):
+                </div>
+                <div className="space-y-1 text-xs">
+                  {result.batchResults.map((batch) => (
+                    <div key={batch.batchNumber} className="flex items-center justify-between text-white/60">
+                      <span>Batch {batch.batchNumber}/{result.totalBatches}:</span>
+                      <span className={batch.failedCount > 0 ? 'text-yellow-400' : 'text-green-400'}>
+                        {batch.successCount} sent {batch.failedCount > 0 && `(${batch.failedCount} failed)`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         <p className="text-white/50 text-xs text-center">First send after opening this page may take 10–15 seconds.</p>

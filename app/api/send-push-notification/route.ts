@@ -125,14 +125,17 @@ export async function POST(request: NextRequest) {
     // FCM sendEachForMulticast can only handle 500 tokens at a time
     // For 35,000+ subscribers, we need to batch the sends
     const BATCH_SIZE = 500
+    const totalBatches = Math.ceil(tokens.length / BATCH_SIZE)
     let successCount = 0
     let totalFailed = 0
     let errorMessage: string | null = null
     const toRemove: string[] = []
+    const batchResults: Array<{ batchNumber: number; successCount: number; failedCount: number }> = []
 
     try {
       // Process tokens in batches of 500
       for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1
         const batchTokens = tokens.slice(i, i + BATCH_SIZE)
         const batchDocIds = docIds.slice(i, i + BATCH_SIZE)
 
@@ -155,8 +158,17 @@ export async function POST(request: NextRequest) {
         }
 
         const batch = await messaging.sendEachForMulticast(message)
-        successCount += batch.successCount
-        totalFailed += batch.failureCount
+        const batchSuccess = batch.successCount
+        const batchFailed = batch.failureCount
+        successCount += batchSuccess
+        totalFailed += batchFailed
+
+        // Track batch results for admin visibility
+        batchResults.push({
+          batchNumber,
+          successCount: batchSuccess,
+          failedCount: batchFailed,
+        })
 
         // Track invalid/unregistered tokens for removal
         batch.responses.forEach((r, j) => {
@@ -170,7 +182,7 @@ export async function POST(request: NextRequest) {
           }
         })
 
-        console.log(`send-push: Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(tokens.length / BATCH_SIZE)}: ${batch.successCount} sent, ${batch.failureCount} failed`)
+        console.log(`send-push: Batch ${batchNumber}/${totalBatches}: ${batchSuccess} sent, ${batchFailed} failed`)
       }
 
       // Remove all invalid/unregistered tokens after all batches complete
@@ -209,7 +221,9 @@ export async function POST(request: NextRequest) {
         success: true,
         subscriberCount,
         successCount,
-        message: `Notification sent to ${successCount} of ${subscriberCount} subscribers`,
+        totalBatches,
+        batchResults,
+        message: `Notification sent to ${successCount} of ${subscriberCount} subscribers across ${totalBatches} batches`,
       })
     }
 
