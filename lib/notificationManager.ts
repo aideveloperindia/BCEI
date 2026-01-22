@@ -79,30 +79,54 @@ export async function subscribeToNotifications(): Promise<{
     }
 
     // Save token to server - CRITICAL: must complete before returning success
-    const response = await fetch('/api/save-fcm-token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token }),
-    })
+    // Add retry logic for quota errors (critical for 35,000 concurrent users)
+    let saveRetries = 0
+    const maxSaveRetries = 3
+    let saveSuccess = false
+    let saveError: string | null = null
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      return {
-        success: false,
-        token: null,
-        error: err.message || 'Failed to save token',
+    while (saveRetries < maxSaveRetries && !saveSuccess) {
+      const response = await fetch('/api/save-fcm-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      })
+
+      if (response.ok) {
+        const saveResult = await response.json().catch(() => ({}))
+        if (saveResult.success) {
+          saveSuccess = true
+          break
+        } else {
+          saveError = saveResult.message || 'Failed to save token'
+        }
+      } else {
+        const err = await response.json().catch(() => ({}))
+        saveError = err.message || 'Failed to save token'
+        
+        // If it's a 503 (Service Unavailable / quota error), retry with backoff
+        if (response.status === 503 && saveRetries < maxSaveRetries - 1) {
+          const delay = 1000 * (saveRetries + 1) // 1s, 2s, 3s
+          console.log(`Token save failed (quota error), retrying in ${delay}ms...`)
+          await new Promise((r) => setTimeout(r, delay))
+          saveRetries++
+          continue
+        }
+      }
+
+      // If not a retryable error, break immediately
+      if (response.status !== 503) {
+        break
       }
     }
 
-    // Verify save response
-    const saveResult = await response.json().catch(() => ({}))
-    if (!saveResult.success) {
+    if (!saveSuccess) {
       return {
         success: false,
         token: null,
-        error: saveResult.message || 'Failed to save token',
+        error: saveError || 'Failed to save token after retries',
       }
     }
 

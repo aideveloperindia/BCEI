@@ -40,14 +40,54 @@ export async function POST(request: NextRequest) {
 
     // Save token to Firestore (use hashed doc ID to avoid invalid chars, prevent duplicates by token)
     // Use set() with merge: false to ensure immediate write (not just update)
-    await collection.doc(docId).set(
-      {
-        token,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      { merge: false }
-    )
+    // Add retry logic for quota errors (critical for 35,000 concurrent users)
+    let retries = 0
+    const maxRetries = 5
+    let lastError: Error | null = null
+
+    while (retries < maxRetries) {
+      try {
+        await collection.doc(docId).set(
+          {
+            token,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          { merge: false }
+        )
+        lastError = null
+        break // Success, exit retry loop
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error')
+        
+        // Check if it's a quota/resource exhaustion error (retry these)
+        const errorMessage = lastError.message.toLowerCase()
+        const isQuotaError = 
+          errorMessage.includes('quota') ||
+          errorMessage.includes('resource') ||
+          errorMessage.includes('exhausted') ||
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('429') ||
+          errorMessage.includes('too many')
+
+        if (isQuotaError && retries < maxRetries - 1) {
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+          const delay = Math.min(1000 * Math.pow(2, retries), 10000)
+          console.warn(`Token save quota error (attempt ${retries + 1}/${maxRetries}), retrying in ${delay}ms...`)
+          await new Promise((r) => setTimeout(r, delay))
+          retries++
+          continue
+        } else {
+          // Not a quota error, or max retries reached - throw immediately
+          throw error
+        }
+      }
+    }
+
+    // If we exhausted retries, throw the last error
+    if (lastError) {
+      throw lastError
+    }
 
     // Verify token was saved and is readable immediately (critical for immediate push testing)
     let savedDoc = await collection.doc(docId).get()
@@ -84,10 +124,31 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error saving FCM token:', error)
+    
+    // Check if it's a quota error (user-friendly message)
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : ''
+    const isQuotaError = 
+      errorMessage.includes('quota') ||
+      errorMessage.includes('resource') ||
+      errorMessage.includes('exhausted') ||
+      errorMessage.includes('rate limit') ||
+      errorMessage.includes('429')
+
+    // Return user-friendly error (not technical)
+    if (isQuotaError) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Server is busy. Please try again in a moment.',
+        },
+        { status: 503 } // Service Unavailable
+      )
+    }
+
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to save token',
+        message: 'Failed to save token. Please try again.',
       },
       { status: 500 }
     )
