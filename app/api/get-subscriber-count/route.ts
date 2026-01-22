@@ -27,25 +27,33 @@ export async function GET(request: NextRequest) {
     // Admin SDK always reads fresh from server - ensures immediate count after subscription
     const snapshot = await collection.get()
     let count = 0
+    const invalidDocs: Array<{ id: string; reason: string }> = []
+    
     snapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
-      // Only count if token exists, is a string, and is not empty (match send-push validation)
+      // Only count if token exists, is a string, and is not empty (EXACT same validation as send-push)
       if (t && typeof t === 'string' && t.trim().length > 0) {
         count++
       } else {
-        console.warn('get-subscriber-count: Skipping invalid token in doc:', doc.id, 'token type:', typeof t, 'has token:', !!t)
+        const reason = !t ? 'MISSING token field' : typeof t !== 'string' ? `Wrong type: ${typeof t}` : `Empty string (length: ${t.length})`
+        invalidDocs.push({ id: doc.id, reason })
+        console.warn(`get-subscriber-count: Skipping invalid token in doc ${doc.id} - ${reason}`)
       }
     })
     
     console.log(`get-subscriber-count: Found ${count} valid tokens out of ${snapshot.size} total docs for domain: ${domain}, collection: ${config.collectionName}`)
     
     // Log all doc IDs for debugging
-    const docIds: string[] = []
+    const allDocIds: string[] = []
     snapshot.forEach((doc) => {
-      docIds.push(doc.id)
+      allDocIds.push(doc.id)
     })
-    console.log(`get-subscriber-count: Doc IDs: ${docIds.join(', ')}`)
+    console.log(`get-subscriber-count: All Doc IDs: ${allDocIds.join(', ')}`)
+    
+    if (invalidDocs.length > 0) {
+      console.error(`get-subscriber-count: Found ${invalidDocs.length} invalid docs (these should be cleaned up):`, invalidDocs)
+    }
 
     return NextResponse.json({
       success: true,

@@ -54,15 +54,24 @@ export async function POST(request: NextRequest) {
     console.log(`send-push-notification: Found ${tokens.length} valid tokens out of ${snapshot.size} total docs for domain: ${domain}, collection: ${config.collectionName}`)
     console.log(`send-push-notification: Doc IDs with valid tokens: ${docIds.join(', ')}`)
     
-    // Always log all docs for debugging (even if count matches)
+    // Always log ALL docs (valid and invalid) for debugging
+    const invalidDocs: Array<{ id: string; reason: string }> = []
     snapshot.forEach((doc) => {
       const data = doc.data()
       const t = data.token
       const isValid = t && typeof t === 'string' && t.trim().length > 0
       if (!isValid) {
-        console.warn(`send-push: Doc ${doc.id}: INVALID - type=${typeof t}, token=${t ? t.substring(0, 40) + '...' : 'MISSING'}`)
+        const reason = !t ? 'MISSING token field' : typeof t !== 'string' ? `Wrong type: ${typeof t}` : `Empty string (length: ${t.length})`
+        invalidDocs.push({ id: doc.id, reason })
+        console.warn(`send-push: Doc ${doc.id}: INVALID - ${reason}`)
+      } else {
+        console.log(`send-push: Doc ${doc.id}: VALID - token length: ${t.length}`)
       }
     })
+    
+    if (invalidDocs.length > 0) {
+      console.error(`send-push: Found ${invalidDocs.length} invalid docs that will be skipped:`, invalidDocs)
+    }
     
     // If count mismatch, log error
     if (snapshot.size !== tokens.length) {
