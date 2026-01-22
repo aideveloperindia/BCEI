@@ -163,23 +163,32 @@ export async function POST(request: NextRequest) {
         successCount += batchSuccess
         totalFailed += batchFailed
 
-        // Track batch results for admin visibility
+        // Track failed tokens for retry capability (exclude invalid/unregistered - those should be deleted)
+        const failedTokens: string[] = []
+        const failedDocIds: string[] = []
+
+        // Track invalid/unregistered tokens for removal
+        batch.responses.forEach((r, j) => {
+          if (!r.success) {
+            if (r.error?.code === 'messaging/invalid-registration-token' || r.error?.code === 'messaging/registration-token-not-registered') {
+              // These should be deleted (invalid/unregistered)
+              toRemove.push(batchDocIds[j])
+              console.log(`send-push: Removing invalid token doc: ${batchDocIds[j]}`)
+            } else {
+              // Other failures (network, quota, etc.) - can be retried
+              failedTokens.push(batchTokens[j])
+              failedDocIds.push(batchDocIds[j])
+            }
+          }
+        })
+
+        // Track batch results for admin visibility (including failed tokens for retry)
         batchResults.push({
           batchNumber,
           successCount: batchSuccess,
           failedCount: batchFailed,
-        })
-
-        // Track invalid/unregistered tokens for removal
-        batch.responses.forEach((r, j) => {
-          if (!r.success && r.error?.code === 'messaging/invalid-registration-token') {
-            toRemove.push(batchDocIds[j])
-            console.log(`send-push: Removing invalid token doc: ${batchDocIds[j]}`)
-          }
-          if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') {
-            toRemove.push(batchDocIds[j])
-            console.log(`send-push: Removing unregistered token doc: ${batchDocIds[j]}`)
-          }
+          failedTokens: failedTokens.length > 0 ? failedTokens : undefined,
+          failedDocIds: failedDocIds.length > 0 ? failedDocIds : undefined,
         })
 
         console.log(`send-push: Batch ${batchNumber}/${totalBatches}: ${batchSuccess} sent, ${batchFailed} failed`)
@@ -204,7 +213,19 @@ export async function POST(request: NextRequest) {
 
     const success = successCount > 0
 
-    await db.collection('notification_logs').add({
+    // Store failed tokens for retry capability
+    const allFailedTokens: string[] = []
+    const allFailedDocIds: string[] = []
+    batchResults.forEach((batch) => {
+      if (batch.failedTokens && batch.failedTokens.length > 0) {
+        allFailedTokens.push(...batch.failedTokens)
+        if (batch.failedDocIds) {
+          allFailedDocIds.push(...batch.failedDocIds)
+        }
+      }
+    })
+
+    const logId = (await db.collection('notification_logs').add({
       title,
       body: messageBody,
       subscriberCount,
@@ -214,7 +235,12 @@ export async function POST(request: NextRequest) {
       error: errorMessage,
       sentAt: new Date(),
       domain,
-    })
+      totalBatches,
+      batchResults,
+      // Store failed tokens for retry (only retryable failures, not invalid tokens)
+      failedTokens: allFailedTokens.length > 0 ? allFailedTokens : undefined,
+      failedDocIds: allFailedDocIds.length > 0 ? allFailedDocIds : undefined,
+    })).id
 
     if (success) {
       return NextResponse.json({
@@ -223,7 +249,9 @@ export async function POST(request: NextRequest) {
         successCount,
         totalBatches,
         batchResults,
-        message: `Notification sent to ${successCount} of ${subscriberCount} subscribers across ${totalBatches} batches`,
+        failedTokensCount: allFailedTokens.length,
+        logId, // Store log ID for retry
+        message: `Notification sent to ${successCount} of ${subscriberCount} subscribers across ${totalBatches} batches${allFailedTokens.length > 0 ? ` (${allFailedTokens.length} failed - can retry)` : ''}`,
       })
     }
 

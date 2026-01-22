@@ -25,6 +25,14 @@ function PushNotificationsContent() {
     subscriberCount?: number
     totalBatches?: number
     batchResults?: Array<{ batchNumber: number; successCount: number; failedCount: number }>
+    failedTokensCount?: number
+    logId?: string
+  } | null>(null)
+  const [lastSendData, setLastSendData] = useState<{
+    title: string
+    body: string
+    logId?: string
+    failedTokensCount?: number
   } | null>(null)
   const [sendingProgress, setSendingProgress] = useState<{
     isSending: boolean
@@ -137,6 +145,15 @@ function PushNotificationsContent() {
           subscriberCount: data.subscriberCount,
           totalBatches: data.totalBatches,
           batchResults: data.batchResults,
+          failedTokensCount: data.failedTokensCount,
+          logId: data.logId,
+        })
+        // Store send data for retry capability
+        setLastSendData({
+          title,
+          body,
+          logId: data.logId,
+          failedTokensCount: data.failedTokensCount,
         })
         fetchSubscriberCount()
         fetchStats()
@@ -362,6 +379,65 @@ function PushNotificationsContent() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+            {/* Retry Failed Button */}
+            {result.success && result.failedTokensCount && result.failedTokensCount > 0 && lastSendData && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <button
+                  onClick={async () => {
+                    if (!lastSendData?.logId) return
+                    setIsSending(true)
+                    setResult(null)
+                    setSendingProgress({
+                      isSending: true,
+                      totalBatches: Math.ceil((result.failedTokensCount || 0) / 500),
+                      message: `Retrying ${result.failedTokensCount} failed notifications...`,
+                    })
+                    try {
+                      const response = await fetch('/api/retry-failed-notifications', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          logId: lastSendData.logId,
+                          title: lastSendData.title,
+                          body: lastSendData.body,
+                        }),
+                      })
+                      const data = await response.json().catch(() => ({}))
+                      if (response.ok && data.success) {
+                        setResult({
+                          success: true,
+                          message: data.message,
+                          subscriberCount: data.subscriberCount,
+                          totalBatches: data.totalBatches,
+                          batchResults: data.batchResults,
+                          failedTokensCount: data.failedTokensCount,
+                          logId: data.logId,
+                        })
+                        fetchSubscriberCount()
+                        fetchStats()
+                      } else {
+                        setResult({
+                          success: false,
+                          message: data.message || 'Retry failed',
+                        })
+                      }
+                    } catch (error) {
+                      setResult({
+                        success: false,
+                        message: 'Retry request failed',
+                      })
+                    } finally {
+                      setIsSending(false)
+                      setSendingProgress(null)
+                    }
+                  }}
+                  disabled={isSending}
+                  className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Retry {result.failedTokensCount} Failed Notifications
+                </button>
               </div>
             )}
           </div>
