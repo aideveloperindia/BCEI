@@ -71,8 +71,26 @@ export async function POST(request: NextRequest) {
 
     const subscriberCount = tokens.length
     
+    // CRITICAL: Verify count matches get-subscriber-count API
+    // Read count using same logic to compare
+    const countSnapshot = await tokensRef.get()
+    let countApiCount = 0
+    countSnapshot.forEach((doc) => {
+      const data = doc.data()
+      const t = data.token
+      if (t && typeof t === 'string' && t.trim().length > 0) {
+        countApiCount++
+      }
+    })
+    
+    if (countApiCount !== subscriberCount) {
+      console.error(`CRITICAL MISMATCH: send-push found ${subscriberCount} tokens but count API logic would find ${countApiCount}`)
+      console.error(`  send-push snapshot size: ${snapshot.size}, tokens: ${tokens.length}`)
+      console.error(`  count API snapshot size: ${countSnapshot.size}, count: ${countApiCount}`)
+    }
+    
     // Log BEFORE sending to see what we're about to send
-    console.log(`send-push-notification: About to send to ${subscriberCount} subscribers (${tokens.length} tokens)`)
+    console.log(`send-push-notification: About to send to ${subscriberCount} subscribers (${tokens.length} tokens), count API would show: ${countApiCount}`)
     
     if (subscriberCount === 0) {
       await db.collection('notification_logs').add({
@@ -118,11 +136,19 @@ export async function POST(request: NextRequest) {
       // Remove invalid/unregistered tokens from Firestore
       const toRemove: string[] = []
       batch.responses.forEach((r, i) => {
-        if (!r.success && r.error?.code === 'messaging/invalid-registration-token') toRemove.push(docIds[i])
-        if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') toRemove.push(docIds[i])
+        if (!r.success && r.error?.code === 'messaging/invalid-registration-token') {
+          toRemove.push(docIds[i])
+          console.log(`send-push: Removing invalid token doc: ${docIds[i]}`)
+        }
+        if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') {
+          toRemove.push(docIds[i])
+          console.log(`send-push: Removing unregistered token doc: ${docIds[i]}`)
+        }
       })
       if (toRemove.length > 0) {
+        console.log(`send-push: Deleting ${toRemove.length} invalid/unregistered tokens`)
         await Promise.all(toRemove.map((id) => tokensRef.doc(id).delete()))
+        console.log(`send-push: Deleted ${toRemove.length} tokens. Remaining subscribers: ${subscriberCount - toRemove.length}`)
       }
 
       if (batch.failureCount > 0 && successCount === 0) {
