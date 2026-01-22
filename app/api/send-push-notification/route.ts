@@ -4,6 +4,7 @@ import { getClientConfig } from '@/config/client-firebase-map'
 import { isValidToken, getTokenValidationReason } from '@/lib/token-validation'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300 // 5 minutes max (for 35,000 subscribers = 70 batches)
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,54 +122,72 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const message = {
-      tokens,
-      notification: { title, body: messageBody },
-      webpush: {
-        headers: { Urgency: 'high' },
-        notification: {
-          title,
-          body: messageBody,
-          icon: `${baseUrl}/advocates-logo.png`,
-          tag: 'bar-council-notification',
-          requireInteraction: false,
-        },
-        fcmOptions: {
-          link: baseUrl,
-        },
-      },
-    }
-
+    // FCM sendEachForMulticast can only handle 500 tokens at a time
+    // For 35,000+ subscribers, we need to batch the sends
+    const BATCH_SIZE = 500
     let successCount = 0
+    let totalFailed = 0
     let errorMessage: string | null = null
+    const toRemove: string[] = []
 
     try {
-      const batch = await messaging.sendEachForMulticast(message)
-      successCount = batch.successCount
+      // Process tokens in batches of 500
+      for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
+        const batchTokens = tokens.slice(i, i + BATCH_SIZE)
+        const batchDocIds = docIds.slice(i, i + BATCH_SIZE)
 
-      // Remove invalid/unregistered tokens from Firestore
-      const toRemove: string[] = []
-      batch.responses.forEach((r, i) => {
-        if (!r.success && r.error?.code === 'messaging/invalid-registration-token') {
-          toRemove.push(docIds[i])
-          console.log(`send-push: Removing invalid token doc: ${docIds[i]}`)
+        const message = {
+          tokens: batchTokens,
+          notification: { title, body: messageBody },
+          webpush: {
+            headers: { Urgency: 'high' },
+            notification: {
+              title,
+              body: messageBody,
+              icon: `${baseUrl}/advocates-logo.png`,
+              tag: 'bar-council-notification',
+              requireInteraction: false,
+            },
+            fcmOptions: {
+              link: baseUrl,
+            },
+          },
         }
-        if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') {
-          toRemove.push(docIds[i])
-          console.log(`send-push: Removing unregistered token doc: ${docIds[i]}`)
-        }
-      })
+
+        const batch = await messaging.sendEachForMulticast(message)
+        successCount += batch.successCount
+        totalFailed += batch.failureCount
+
+        // Track invalid/unregistered tokens for removal
+        batch.responses.forEach((r, j) => {
+          if (!r.success && r.error?.code === 'messaging/invalid-registration-token') {
+            toRemove.push(batchDocIds[j])
+            console.log(`send-push: Removing invalid token doc: ${batchDocIds[j]}`)
+          }
+          if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') {
+            toRemove.push(batchDocIds[j])
+            console.log(`send-push: Removing unregistered token doc: ${batchDocIds[j]}`)
+          }
+        })
+
+        console.log(`send-push: Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(tokens.length / BATCH_SIZE)}: ${batch.successCount} sent, ${batch.failureCount} failed`)
+      }
+
+      // Remove all invalid/unregistered tokens after all batches complete
       if (toRemove.length > 0) {
         console.log(`send-push: Deleting ${toRemove.length} invalid/unregistered tokens`)
         await Promise.all(toRemove.map((id) => tokensRef.doc(id).delete()))
         console.log(`send-push: Deleted ${toRemove.length} tokens. Remaining subscribers: ${subscriberCount - toRemove.length}`)
       }
 
-      if (batch.failureCount > 0 && successCount === 0) {
-        errorMessage = batch.responses.find((r) => !r.success)?.error?.message ?? 'All sends failed'
+      if (totalFailed > 0 && successCount === 0) {
+        errorMessage = 'All sends failed across all batches'
+      } else if (totalFailed > 0) {
+        errorMessage = `${totalFailed} sends failed (${successCount} succeeded)`
       }
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      console.error('send-push: Error during batch sending:', err)
     }
 
     const success = successCount > 0
