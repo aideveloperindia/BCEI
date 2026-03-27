@@ -148,12 +148,20 @@ function NewsContent() {
           <h1 className="text-white text-2xl font-semibold">
             {editingId ? 'Edit News' : 'Add News'}
           </h1>
-          <Link
-            href="/admin/push-notifications"
-            className="text-white/70 hover:text-white text-sm underline"
-          >
-            Send Push
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/admin/push-notifications"
+              className="text-white/70 hover:text-white text-sm underline"
+            >
+              Send Push
+            </Link>
+            <Link
+              href="/admin/leads"
+              className="text-white/70 hover:text-white text-sm underline"
+            >
+              Leads
+            </Link>
+          </div>
         </div>
 
         {editingId && (

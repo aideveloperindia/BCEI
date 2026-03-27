@@ -203,6 +203,12 @@ function PushNotificationsContent() {
             >
               News
             </Link>
+            <Link
+              href="/admin/leads"
+              className="text-white/70 hover:text-white text-sm underline"
+            >
+              Leads
+            </Link>
             <button
               onClick={() => setShowAnalytics(!showAnalytics)}
               className="text-white/70 hover:text-white text-sm underline"

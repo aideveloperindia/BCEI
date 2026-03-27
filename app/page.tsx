@@ -2,8 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { subscribeToNotifications, setupForegroundNotifications } from '@/lib/notificationManager'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
+import { getStoredLeadId } from '@/lib/admission-lead'
+import { SiteNavbar } from '@/components/site/SiteNavbar'
+import { fadeUp } from '@/lib/motion'
 
 interface NewsItem {
   id: string
@@ -18,8 +23,11 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [latestNews, setLatestNews] = useState<NewsItem | null>(null)
   const [isLoadingNews, setIsLoadingNews] = useState(false)
+  const [leadId, setLeadId] = useState<string | null>(null)
 
   useEffect(() => {
+    setLeadId(getStoredLeadId())
+
     // Setup foreground notifications (when tab is open, FCM only triggers onMessage — we show the notification)
     setupForegroundNotifications((payload) => {
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -67,23 +75,10 @@ export default function Home() {
             }
           }
 
-          // If token check failed, try full subscription (ensures token is saved)
-          const result = await subscribeToNotifications()
-          if (result.success) {
-            setIsSubscribed(true)
-            fetchLatestNews()
-          }
+          setIsSubscribed(false)
         } catch (error) {
           console.error('Error checking subscription:', error)
-          // Fallback: try subscription
-          subscribeToNotifications()
-            .then((r) => {
-              if (r.success) {
-                setIsSubscribed(true)
-                fetchLatestNews()
-              }
-            })
-            .catch(() => {})
+          setIsSubscribed(false)
         }
       }
     }
@@ -119,7 +114,7 @@ export default function Home() {
     setError(null)
 
     try {
-      const result = await subscribeToNotifications()
+      const result = await subscribeToNotifications({ leadId: leadId || undefined })
 
       if (result.success) {
         setIsSubscribed(true)
@@ -131,7 +126,7 @@ export default function Home() {
         console.error('Subscription failed:', result.error)
         // Retry once after a delay
         await new Promise((r) => setTimeout(r, 2000))
-        const retryResult = await subscribeToNotifications()
+        const retryResult = await subscribeToNotifications({ leadId: leadId || undefined })
         if (retryResult.success) {
           setIsSubscribed(true)
         } else {
@@ -150,80 +145,149 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+    <main className="min-h-screen bg-background text-foreground">
       <ServiceWorkerRegistration />
-      <div className="flex flex-col items-center justify-center space-y-8 max-w-md w-full">
-        {/* Logo - light circle so dark logo is visible on black background */}
-        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-lg ring-2 ring-white/20">
-          <Image
-            src="/logo.png"
-            alt="Any School Fee Discount Logo"
-            width={160}
-            height={160}
-            className="object-cover w-full h-full"
-            priority
-            unoptimized
-          />
-        </div>
+      <SiteNavbar />
 
-        {/* Title */}
-        <h1 className="text-white text-2xl md:text-3xl font-semibold text-center">
-          Any School Fee Discount
-        </h1>
+      <section className="relative flex min-h-screen items-center justify-center px-4 pb-20 pt-28 md:pt-32">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover opacity-35"
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260325_120549_0cd82c36-56b3-4dd9-b190-069cfc3a623f.mp4"
+        />
+        <div className="absolute bottom-0 h-64 w-full bg-gradient-to-t from-background to-transparent" />
 
-        {/* Button or News Content (only for subscribed users) */}
-        {isSubscribed ? (
-          <div className="w-full space-y-6">
-            {isLoadingNews ? (
-              <div className="text-white/50 text-center py-8">Loading news...</div>
-            ) : latestNews ? (
-              <div className="bg-white/5 border border-white/10 rounded-lg p-6 space-y-4">
-                <div className="text-green-400 text-sm font-medium mb-2">
-                  ✓ You&apos;re subscribed
-                </div>
-                <div className="space-y-3">
-                  <h2 className="text-white text-xl font-semibold">{latestNews.title}</h2>
-                  <div className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">
-                    {latestNews.body}
+        <div className="relative z-10 mx-auto w-full max-w-3xl space-y-8 text-center">
+          <motion.div {...fadeUp(0)} className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
+            <div className="-space-x-2 flex">
+              {['/logo.png', '/logo.png', '/logo.png'].map((avatar, index) => (
+                <Image
+                  key={index}
+                  src={avatar}
+                  alt="Subscriber avatar"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-full border-2 border-background object-cover"
+                  unoptimized
+                />
+              ))}
+            </div>
+            <span>7,000+ parents already subscribed</span>
+          </motion.div>
+
+          <motion.h1
+            {...fadeUp(0.05)}
+            className="text-4xl font-medium tracking-[-1.5px] md:text-6xl lg:text-7xl"
+          >
+            Admission updates with{' '}
+            <span className="font-serif italic font-normal">clarity</span>
+          </motion.h1>
+
+          <motion.p
+            {...fadeUp(0.1)}
+            className="mx-auto max-w-2xl text-base text-[hsl(var(--hero-subtitle))] md:text-lg"
+          >
+            Join our feed for school admission opportunities, seat updates, and benefit guidance
+            for top schools in Karimnagar.
+          </motion.p>
+
+          <motion.div {...fadeUp(0.15)} className="mx-auto max-w-lg">
+            {isSubscribed ? (
+              <div className="liquid-glass rounded-2xl p-5 text-left">
+                <p className="mb-2 text-sm text-white/70">You are subscribed.</p>
+                {isLoadingNews ? (
+                  <p className="text-sm text-white/60">Loading latest news...</p>
+                ) : latestNews ? (
+                  <div className="space-y-3">
+                    <h2 className="text-xl font-semibold">{latestNews.title}</h2>
+                    <p className="text-sm text-white/80 whitespace-pre-wrap">{latestNews.body}</p>
                   </div>
-                  {latestNews.createdAt && (
-                    <div className="text-white/40 text-xs pt-2 border-t border-white/10">
-                      {new Date(latestNews.createdAt).toLocaleString()}
-                    </div>
-                  )}
-                </div>
+                ) : (
+                  <p className="text-sm text-white/70">No news updates yet. Check back soon.</p>
+                )}
+              </div>
+            ) : leadId ? (
+              <div className="liquid-glass rounded-3xl p-2">
+                <button
+                  onClick={handleAllowNotifications}
+                  disabled={isLoading}
+                  className="w-full rounded-full bg-foreground px-8 py-3 font-semibold text-background transition hover:scale-[1.02] disabled:opacity-50"
+                >
+                  {isLoading ? 'Setting up notifications...' : 'Allow Notifications'}
+                </button>
+                <p className="px-3 pt-3 text-center text-xs text-muted-foreground">
+                  Final step to activate your benefits and receive real-time admission alerts.
+                </p>
               </div>
             ) : (
-              <div className="text-center space-y-4">
-                <div className="text-green-400 text-lg font-medium">
-                  ✓ You&apos;re subscribed!
-                </div>
-                <p className="text-white/70 text-sm">
-                  You&apos;ll receive important election updates
-                </p>
-                <p className="text-white/50 text-xs">
-                  No news updates yet. Check back soon!
-                </p>
-              </div>
+              <Link
+                href="/admission/start"
+                className="inline-flex w-full items-center justify-center rounded-full bg-foreground px-8 py-3 font-semibold text-background transition hover:scale-[1.02]"
+              >
+                Get Admission Benefits
+              </Link>
             )}
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="border-t border-border/30 px-4 py-20 md:py-28">
+        <motion.div {...fadeUp(0)} className="mx-auto max-w-5xl text-center">
+          <h2 className="text-3xl md:text-5xl">
+            Admission process has <span className="font-serif italic">changed.</span> Are you ready?
+          </h2>
+          <p className="mx-auto mt-5 max-w-2xl text-muted-foreground">
+            We help families move from uncertainty to confirmed admissions with clear steps and
+            school-facing lead tracking.
+          </p>
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {[
+              {
+                title: 'Step 1: Register',
+                desc: 'Share parent details and receive your lead ID instantly.',
+              },
+              {
+                title: 'Step 2: Child Profile',
+                desc: 'Add each child class/school details to improve matching.',
+              },
+              {
+                title: 'Step 3: Preferences',
+                desc: 'Set school choices, budget and transport needs.',
+              },
+            ].map((item, index) => (
+              <motion.div
+                key={item.title}
+                {...fadeUp(index * 0.08)}
+                className="liquid-glass rounded-2xl p-6 text-left"
+              >
+                <h3 className="text-lg font-semibold">{item.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{item.desc}</p>
+              </motion.div>
+            ))}
           </div>
-        ) : (
-          <div className="w-full space-y-2">
-            <button
-              onClick={handleAllowNotifications}
-              disabled={isLoading}
-              className="w-full bg-white text-black font-semibold py-4 px-8 rounded-lg hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-            >
-              {isLoading ? 'Setting up notifications...' : 'Allow Notifications'}
-            </button>
-            {isLoading && (
-              <p className="text-white/50 text-xs text-center">
-                Please wait, this may take a few seconds...
-              </p>
-            )}
+          {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
+        </motion.div>
+      </section>
+
+      <footer className="border-t border-border/30 px-6 py-10 md:px-14">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 text-sm text-muted-foreground md:flex-row md:items-center">
+          <p>© 2026 Any School Fee Discount. All rights reserved.</p>
+          <div className="flex items-center gap-4">
+            <Link href="/admission/benefits" className="hover:text-foreground">
+              Benefits
+            </Link>
+            <Link href="/admission/start" className="hover:text-foreground">
+              Start
+            </Link>
+            <Link href="/admin" className="hover:text-foreground">
+              Admin
+            </Link>
           </div>
-        )}
-      </div>
+        </div>
+      </footer>
     </main>
   )
 }

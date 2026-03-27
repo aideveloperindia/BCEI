@@ -24,7 +24,7 @@ async function waitForServiceWorker(maxWait = 10000): Promise<boolean> {
   return false
 }
 
-export async function subscribeToNotifications(): Promise<{
+export async function subscribeToNotifications(options?: { leadId?: string }): Promise<{
   success: boolean
   token: string | null
   error?: string
@@ -91,7 +91,7 @@ export async function subscribeToNotifications(): Promise<{
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, leadId: options?.leadId }),
       })
 
       if (response.ok) {

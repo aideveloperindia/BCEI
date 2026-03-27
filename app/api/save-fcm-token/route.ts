@@ -2,6 +2,8 @@ import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirestore, getMessaging } from '@/lib/firebase-admin'
 import { getClientConfig } from '@/config/client-firebase-map'
+import { getMongoDb } from '@/lib/mongodb'
+import { LeadDocument } from '@/lib/lead-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // Get FCM token from request body
     const body = await request.json()
-    const { token } = body
+    const { token, leadId } = body
 
     if (!token || typeof token !== 'string') {
       return NextResponse.json(
@@ -131,6 +133,24 @@ export async function POST(request: NextRequest) {
 
     // Token is saved and subscribed to topic - ready for immediate push notifications
     console.log('Token saved successfully for domain:', domain, 'docId:', docId, 'topic:', config.topicName)
+
+    if (typeof leadId === 'string' && leadId.trim().length > 0) {
+      try {
+        const dbMongo = await getMongoDb()
+        await dbMongo.collection<LeadDocument>('leads').updateOne(
+          { leadId: leadId.trim() },
+          {
+            $set: {
+              'status.notificationAllowed': true,
+              'status.stage': 'notifications_enabled',
+              updatedAt: new Date(),
+            },
+          }
+        )
+      } catch (mongoError) {
+        console.error('Failed to update lead notificationAllowed (non-critical):', mongoError)
+      }
+    }
 
     return NextResponse.json({
       success: true,
