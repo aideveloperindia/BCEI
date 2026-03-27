@@ -8,13 +8,14 @@ import {
   generateFinalCompletionId,
   getNextPhase,
 } from '@/lib/lead-server'
+import { SchoolAdminDocument } from '@/lib/school-admin'
 
 export const dynamic = 'force-dynamic'
 
 type RequestBody = {
   leadId?: string
   phase?: LeadPhase
-  schoolName?: string
+  schoolId?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as RequestBody
     const leadId = typeof body.leadId === 'string' ? body.leadId.trim() : ''
     const phase = body.phase
-    const schoolName = typeof body.schoolName === 'string' ? body.schoolName.trim() : ''
+    const schoolId = typeof body.schoolId === 'string' ? body.schoolId.trim() : ''
 
     if (!leadId || !phase || !LEAD_PHASES.includes(phase)) {
       return NextResponse.json(
@@ -31,14 +32,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!schoolName) {
+    if (!schoolId) {
       return NextResponse.json(
-        { success: false, message: 'schoolName is required.' },
+        { success: false, message: 'schoolId is required.' },
         { status: 400 }
       )
     }
 
     const db = await getMongoDb()
+    const school = await db
+      .collection<SchoolAdminDocument>('school_admins')
+      .findOne({ schoolId, isActive: true })
+    if (!school) {
+      return NextResponse.json({ success: false, message: 'Invalid school admin session.' }, { status: 401 })
+    }
+
     const leadsCollection = db.collection<LeadDocument>('leads')
     const lead = await leadsCollection.findOne({ leadId })
 
@@ -88,7 +96,7 @@ export async function POST(request: NextRequest) {
               {
                 phase,
                 ackId,
-                schoolName,
+                schoolName: school.schoolName,
                 createdAt: now,
               },
             ],

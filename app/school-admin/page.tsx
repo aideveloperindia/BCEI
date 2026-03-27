@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
+import { SchoolAdminProtection } from '@/components/SchoolAdminProtection'
 
 const phases = [
   { id: 'P1_CALL', label: 'P1_CALL - Parent Call' },
@@ -11,7 +12,15 @@ const phases = [
 
 export default function SchoolAdminPage() {
   const [leadId, setLeadId] = useState('')
-  const [schoolName, setSchoolName] = useState('')
+  const [schoolAdmin] = useState<{
+    schoolId: string
+    schoolName: string
+    username: string
+  } | null>(() => {
+    if (typeof window === 'undefined') return null
+    const raw = sessionStorage.getItem('school_admin')
+    return raw ? JSON.parse(raw) : null
+  })
   const [phase, setPhase] = useState<(typeof phases)[number]['id']>('P1_CALL')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<{
@@ -33,7 +42,7 @@ export default function SchoolAdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId: leadId.trim(),
-          schoolName: schoolName.trim(),
+          schoolId: schoolAdmin?.schoolId,
           phase,
         }),
       })
@@ -53,6 +62,7 @@ export default function SchoolAdminPage() {
   }
 
   return (
+    <SchoolAdminProtection>
     <main className="min-h-screen bg-black p-4 text-white">
       <div className="mx-auto max-w-2xl space-y-6 pt-8">
         <div>
@@ -60,19 +70,14 @@ export default function SchoolAdminPage() {
           <p className="mt-2 text-sm text-white/70">
             Enter parent Lead ID and phase to generate acknowledgement ID.
           </p>
+          {schoolAdmin ? (
+            <p className="mt-1 text-xs text-white/60">
+              Logged in as: {schoolAdmin.schoolName} ({schoolAdmin.username})
+            </p>
+          ) : null}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-5">
-          <div>
-            <label className="mb-2 block text-sm text-white/80">School Name</label>
-            <input
-              value={schoolName}
-              onChange={(e) => setSchoolName(e.target.value)}
-              placeholder="Enter your school name"
-              className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-sm outline-none focus:border-white/40"
-              required
-            />
-          </div>
           <div>
             <label className="mb-2 block text-sm text-white/80">Lead ID</label>
             <input
@@ -128,5 +133,6 @@ export default function SchoolAdminPage() {
         </div>
       </div>
     </main>
+    </SchoolAdminProtection>
   )
 }

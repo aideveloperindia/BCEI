@@ -123,6 +123,9 @@ function AdminLeadsContent() {
             <Link href="/admin/push-notifications" className="text-white/70 underline hover:text-white">
               Push
             </Link>
+            <Link href="/admin/school-admins" className="text-white/70 underline hover:text-white">
+              School Admins
+            </Link>
           </div>
         </div>
 
