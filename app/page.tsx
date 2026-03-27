@@ -18,6 +18,12 @@ interface NewsItem {
 }
 
 export default function Home() {
+  const subscriberPhotos = [
+    'https://i.pravatar.cc/64?img=32',
+    'https://i.pravatar.cc/64?img=47',
+    'https://i.pravatar.cc/64?img=12',
+  ]
+
   const [showOpeningMessage, setShowOpeningMessage] = useState(true)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -180,7 +186,7 @@ export default function Home() {
         <div className="relative z-10 mx-auto w-full max-w-3xl space-y-8 text-center">
           <motion.div {...fadeUp(0)} className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
             <div className="-space-x-2 flex">
-              {['/logo.png', '/logo.png', '/logo.png'].map((avatar, index) => (
+              {subscriberPhotos.map((avatar, index) => (
                 <Image
                   key={index}
                   src={avatar}
@@ -255,7 +261,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-t border-border/30 px-4 py-20 md:py-28">
+      <section id="latest-updates" className="border-t border-border/30 px-4 py-20 md:py-28">
         <motion.div {...fadeUp(0)} className="mx-auto max-w-5xl text-center">
           <h2 className="text-3xl md:text-5xl">
             School fee discounts are possible. <span className="font-serif italic">Let us help you get them.</span>
@@ -306,7 +312,10 @@ export default function Home() {
               Start
             </Link>
             <Link href="/admin" className="hover:text-foreground">
-              Admin
+              School Admin Dashboard
+            </Link>
+            <Link href="/school-admin" className="hover:text-foreground">
+              School Portal
             </Link>
           </div>
         </div>

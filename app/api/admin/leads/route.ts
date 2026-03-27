@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMongoDb } from '@/lib/mongodb'
-import { LeadDocument } from '@/lib/lead-server'
+import { LeadDocument, getNextPhase } from '@/lib/lead-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,6 +63,13 @@ export async function GET(request: NextRequest) {
         children: lead.children || [],
         preferences: lead.preferences,
         status: lead.status,
+        process: {
+          currentPhase: lead.process?.currentPhase || getNextPhase(lead.process),
+          completedPhases: lead.process?.completedPhases || [],
+          phaseRecords: lead.process?.phaseRecords || [],
+          isCompleted: Boolean(lead.process?.isCompleted),
+          finalCompletionId: lead.process?.finalCompletionId || null,
+        },
         createdAt: lead.createdAt,
         updatedAt: lead.updatedAt,
       })),

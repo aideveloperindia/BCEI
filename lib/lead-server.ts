@@ -1,5 +1,23 @@
 import { Db } from 'mongodb'
 
+export const LEAD_PHASES = ['P1_CALL', 'P2_VISIT', 'P3_ADMISSION_CONFIRM'] as const
+export type LeadPhase = (typeof LEAD_PHASES)[number]
+
+export interface LeadPhaseRecord {
+  phase: LeadPhase
+  ackId: string
+  schoolName: string
+  createdAt: Date
+}
+
+export interface LeadProcessState {
+  currentPhase: LeadPhase
+  completedPhases: LeadPhase[]
+  phaseRecords: LeadPhaseRecord[]
+  isCompleted: boolean
+  finalCompletionId?: string
+}
+
 export interface LeadDocument {
   leadId: string
   parent: {
@@ -22,6 +40,7 @@ export interface LeadDocument {
     stage: string
     notificationAllowed: boolean
   }
+  process: LeadProcessState
   createdAt: Date
   updatedAt: Date
 }
@@ -41,4 +60,19 @@ export async function generateUniqueLeadId(db: Db): Promise<string> {
   }
 
   throw new Error('Unable to generate unique lead ID')
+}
+
+export function getNextPhase(process?: Partial<LeadProcessState> | null): LeadPhase {
+  const completed = process?.completedPhases || []
+  const next = LEAD_PHASES.find((phase) => !completed.includes(phase))
+  return next || 'P3_ADMISSION_CONFIRM'
+}
+
+export function generateAckId(phase: LeadPhase): string {
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase()
+  return `ACK-${phase.replace('P', '')}-${suffix}`
+}
+
+export function generateFinalCompletionId(): string {
+  return `COMP-${Date.now().toString(36).toUpperCase()}`
 }

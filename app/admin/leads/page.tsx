@@ -27,6 +27,18 @@ interface AdminLead {
     stage: string
     notificationAllowed: boolean
   }
+  process?: {
+    currentPhase: string
+    completedPhases: string[]
+    phaseRecords: Array<{
+      phase: string
+      ackId: string
+      schoolName: string
+      createdAt: string
+    }>
+    isCompleted: boolean
+    finalCompletionId?: string | null
+  }
   createdAt: string
   updatedAt: string
 }
@@ -214,6 +226,35 @@ function AdminLeadsContent() {
                   ) : (
                     <p className="text-sm text-white/60">No children data added yet.</p>
                   )}
+                </div>
+
+                <div className="rounded border border-white/10 bg-black/20 p-3">
+                  <p className="mb-2 text-sm text-white/60">Lead Lifecycle</p>
+                  <p className="text-xs text-white/70">
+                    Current Phase: <span className="font-semibold text-white">{lead.process?.currentPhase || 'P1_CALL'}</span>
+                  </p>
+                  <p className="text-xs text-white/70">
+                    Completed: <span className="font-semibold text-white">{lead.process?.completedPhases?.join(', ') || 'None'}</span>
+                  </p>
+                  {lead.process?.finalCompletionId ? (
+                    <p className="mt-1 text-xs text-green-300">
+                      Final Completion ID: <span className="font-semibold">{lead.process.finalCompletionId}</span>
+                    </p>
+                  ) : null}
+
+                  <div className="mt-3 space-y-2">
+                    {(lead.process?.phaseRecords || []).length ? (
+                      (lead.process?.phaseRecords || []).map((record) => (
+                        <div key={`${lead.leadId}-${record.ackId}`} className="rounded border border-white/10 p-2 text-xs">
+                          <p className="font-semibold">{record.phase}</p>
+                          <p>ACK: {record.ackId}</p>
+                          <p>School: {record.schoolName}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-white/60">No school phase records yet.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             ))

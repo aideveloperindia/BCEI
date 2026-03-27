@@ -51,6 +51,12 @@ export async function POST(request: NextRequest) {
         stage: 'step1_completed',
         notificationAllowed: false,
       },
+      process: {
+        currentPhase: 'P1_CALL',
+        completedPhases: [],
+        phaseRecords: [],
+        isCompleted: false,
+      },
       createdAt: now,
       updatedAt: now,
     }
