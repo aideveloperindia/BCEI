@@ -35,6 +35,17 @@ export const clientFirebaseMap: Record<string, ClientFirebaseConfig> = {
       subtitle: 'Get the latest school fee discount updates',
     },
   },
+  // Production alias/custom deployment
+  'schoolfeebenefits.vercel.app': {
+    projectId: 'bcei-b4627',
+    serviceAccountEnv: 'FIREBASE_SERVICE_ACCOUNT_CLIENT1',
+    collectionName: 'fcm_tokens',
+    topicName: 'notifications',
+    branding: {
+      title: 'Any School Fee Discount',
+      subtitle: 'Get the latest school fee discount updates',
+    },
+  },
 };
 
 // Get config for current domain
