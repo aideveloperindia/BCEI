@@ -19,9 +19,9 @@ interface NewsItem {
 
 export default function Home() {
   const subscriberPhotos = [
-    'https://source.unsplash.com/featured/64x64/?south-indian,elderly,man,portrait&sig=11',
-    'https://source.unsplash.com/featured/64x64/?south-indian,elderly,woman,portrait&sig=12',
-    'https://source.unsplash.com/featured/64x64/?indian,senior,parent,portrait&sig=13',
+    '/avatars/parent-1.jpg',
+    '/avatars/parent-2.jpg',
+    '/avatars/parent-3.jpg',
   ]
 
   const [showOpeningMessage, setShowOpeningMessage] = useState(true)
