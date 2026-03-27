@@ -134,8 +134,8 @@ function NewsContent() {
       <div className="flex flex-col items-center justify-center space-y-8 max-w-2xl w-full">
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center p-2 shadow-lg ring-2 ring-white/20">
           <Image
-            src="/advocates-logo.png"
-            alt="Advocates Logo"
+            src="/logo.png"
+            alt="Any School Fee Discount Logo"
             width={96}
             height={96}
             className="object-contain w-full h-full"
@@ -209,6 +209,25 @@ function NewsContent() {
             )}
           </div>
         </form>
+
+        <div className="w-full bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
+          <div className="text-white/70 text-sm font-semibold">Live Preview (Landing Page)</div>
+          <div className="bg-black/40 border border-white/10 rounded-lg p-4">
+            <div className="text-green-400 text-sm font-medium mb-2">✓ You&apos;re subscribed</div>
+            {title.trim() || body.trim() ? (
+              <div className="space-y-2">
+                <h3 className="text-white text-lg font-semibold">
+                  {title.trim() || 'News title will appear here'}
+                </h3>
+                <div className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">
+                  {body.trim() || 'News content will appear here'}
+                </div>
+              </div>
+            ) : (
+              <div className="text-white/50 text-sm">Start typing news to preview how users will see it.</div>
+            )}
+          </div>
+        </div>
 
         {result && (
           <div

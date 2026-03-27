@@ -20,8 +20,8 @@ export const clientFirebaseMap: Record<string, ClientFirebaseConfig> = {
     collectionName: 'fcm_tokens',
     topicName: 'notifications',
     branding: {
-      title: 'Get Bar Council Election Updates',
-      subtitle: 'Stay updated with important election updates',
+      title: 'Any School Fee Discount',
+      subtitle: 'Get the latest school fee discount updates',
     },
   },
   // Production: https://bcei.vercel.app
@@ -31,8 +31,8 @@ export const clientFirebaseMap: Record<string, ClientFirebaseConfig> = {
     collectionName: 'fcm_tokens',
     topicName: 'notifications',
     branding: {
-      title: 'Get Bar Council Election Updates',
-      subtitle: 'Stay updated with important election updates',
+      title: 'Any School Fee Discount',
+      subtitle: 'Get the latest school fee discount updates',
     },
   },
 };

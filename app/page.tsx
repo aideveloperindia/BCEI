@@ -23,9 +23,9 @@ export default function Home() {
     // Setup foreground notifications (when tab is open, FCM only triggers onMessage — we show the notification)
     setupForegroundNotifications((payload) => {
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification(payload?.notification?.title || 'Bar Council Update', {
+        new Notification(payload?.notification?.title || 'Any School Fee Discount Update', {
           body: payload?.notification?.body,
-          icon: '/advocates-logo.png',
+          icon: '/logo.png',
         })
       }
     })
@@ -156,8 +156,8 @@ export default function Home() {
         {/* Logo - light circle so dark logo is visible on black background */}
         <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white flex items-center justify-center p-3 shadow-lg ring-2 ring-white/20">
           <Image
-            src="/advocates-logo.png"
-            alt="Advocates Logo"
+            src="/logo.png"
+            alt="Any School Fee Discount Logo"
             width={160}
             height={160}
             className="object-contain w-full h-full"
@@ -168,7 +168,7 @@ export default function Home() {
 
         {/* Title */}
         <h1 className="text-white text-2xl md:text-3xl font-semibold text-center">
-          Get Bar Council Election Updates
+          Any School Fee Discount
         </h1>
 
         {/* Button or News Content (only for subscribed users) */}

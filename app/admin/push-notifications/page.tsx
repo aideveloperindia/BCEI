@@ -14,7 +14,7 @@ export default function PushNotificationsPage() {
 }
 
 function PushNotificationsContent() {
-  const [title, setTitle] = useState('Important Bar Council News')
+  const [title, setTitle] = useState('Important School Fee Discount Update')
   const [body, setBody] = useState('Stay updated with latest information')
   const [subscriberCount, setSubscriberCount] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -181,8 +181,8 @@ function PushNotificationsContent() {
         {/* Logo - light circle so dark logo is visible on black background */}
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center p-2 shadow-lg ring-2 ring-white/20">
           <Image
-            src="/advocates-logo.png"
-            alt="Advocates Logo"
+            src="/logo.png"
+            alt="Any School Fee Discount Logo"
             width={96}
             height={96}
             className="object-contain w-full h-full"

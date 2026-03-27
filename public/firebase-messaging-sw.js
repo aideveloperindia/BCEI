@@ -34,12 +34,12 @@ fetch('/api/firebase-config', { cache: 'no-store' })
     messaging.onBackgroundMessage((payload) => {
       console.log('Background message received:', payload)
 
-      const notificationTitle = payload.notification?.title || 'Bar Council Update'
+      const notificationTitle = payload.notification?.title || 'Any School Fee Discount Update'
       const notificationOptions = {
         body: payload.notification?.body || 'You have a new update',
-        icon: '/advocates-logo.png',
-        badge: '/advocates-logo.png',
-        tag: 'bar-council-notification',
+        icon: '/logo.png',
+        badge: '/logo.png',
+        tag: 'school-fee-discount-notification',
         requireInteraction: false,
         data: {
           url: payload.fcmOptions?.link || '/',

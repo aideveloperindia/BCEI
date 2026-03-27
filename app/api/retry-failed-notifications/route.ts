@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
             notification: {
               title,
               body: messageBody,
-              icon: `${baseUrl}/advocates-logo.png`,
-              tag: 'bar-council-notification',
+              icon: `${baseUrl}/logo.png`,
+              tag: 'school-fee-discount-notification',
               requireInteraction: false,
             },
             fcmOptions: {
