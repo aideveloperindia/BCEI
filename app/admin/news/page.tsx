@@ -5,6 +5,19 @@ import { AdminProtection } from '@/components/AdminProtection'
 import Image from 'next/image'
 import Link from 'next/link'
 
+const NEWS_TEMPLATES = [
+  {
+    title: 'Get the best possible school fee discount - we negotiate for you',
+    body:
+      'School admissions made smarter: we help you secure the best possible fee discounts.\n\nPlanning to change your child\'s school? We support new admissions and help you secure the best possible fee discount.\n\nYou focus on your child\'s future, we focus on negotiating better school fee discounts.\n\nComplete your details now and stay active on WhatsApp for priority support.',
+  },
+  {
+    title: 'Your child\'s admission, your advantage',
+    body:
+      'Your child\'s admission, your advantage - we work with schools to unlock fee discounts for you.\n\nNew school admission support for transfer families - with discount-focused guidance.\n\nSwitch your child to a better school with expert admission help and fee discount support.\n\nRespond quickly to improve your discount opportunity.',
+  },
+]
+
 export default function NewsPage() {
   return (
     <AdminProtection>
@@ -14,8 +27,8 @@ export default function NewsPage() {
 }
 
 function NewsContent() {
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
+  const [title, setTitle] = useState(NEWS_TEMPLATES[0].title)
+  const [body, setBody] = useState(NEWS_TEMPLATES[0].body)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -171,6 +184,25 @@ function NewsContent() {
         )}
 
         <form onSubmit={handleSave} className="w-full space-y-4">
+          <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-white/60">Quick Templates</p>
+            <div className="grid gap-2 md:grid-cols-2">
+              {NEWS_TEMPLATES.map((template) => (
+                <button
+                  key={template.title}
+                  type="button"
+                  onClick={() => {
+                    setTitle(template.title)
+                    setBody(template.body)
+                  }}
+                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-left text-xs text-white/80 transition hover:bg-white/10"
+                >
+                  {template.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-white/70 text-sm mb-2">News Title</label>
             <input

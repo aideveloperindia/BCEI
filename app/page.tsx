@@ -18,6 +18,7 @@ interface NewsItem {
 }
 
 export default function Home() {
+  const [showOpeningMessage, setShowOpeningMessage] = useState(true)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -87,6 +88,13 @@ export default function Home() {
     checkSubscriptionStatus()
   }, [])
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowOpeningMessage(false)
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [])
+
   const fetchLatestNews = async () => {
     setIsLoadingNews(true)
     try {
@@ -148,6 +156,15 @@ export default function Home() {
     <main className="min-h-screen bg-background text-foreground">
       <ServiceWorkerRegistration />
       <SiteNavbar />
+      {showOpeningMessage ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-6 backdrop-blur-md">
+          <div className="max-w-4xl text-center">
+            <p className="text-3xl font-semibold leading-tight text-white drop-shadow-lg md:text-5xl md:leading-tight">
+              Get the best possible school fee discount - we negotiate with schools on your behalf.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <section className="relative flex min-h-screen items-center justify-center px-4 pb-20 pt-28 md:pt-32">
         <video
@@ -182,16 +199,20 @@ export default function Home() {
             {...fadeUp(0.05)}
             className="text-4xl font-medium tracking-[-1.5px] md:text-6xl lg:text-7xl"
           >
-            Admission updates with{' '}
-            <span className="font-serif italic font-normal">clarity</span>
+            Get the best possible school fee discount.{' '}
+            <span className="font-serif italic font-normal">We negotiate for you.</span>
           </motion.h1>
 
           <motion.p
             {...fadeUp(0.1)}
             className="mx-auto max-w-2xl text-base text-[hsl(var(--hero-subtitle))] md:text-lg"
           >
-            Join our feed for school admission opportunities, seat updates, and benefit guidance
-            for top schools in Karimnagar.
+            Join now to get discount-focused admission updates. Our team coordinates with schools and
+            helps parents secure the best possible fee discount opportunities.
+          </motion.p>
+          <motion.p {...fadeUp(0.12)} className="mx-auto max-w-2xl text-sm text-muted-foreground md:text-base">
+            Planning to change your child&apos;s school? We support new admissions and help you secure
+            the best possible fee discount.
           </motion.p>
 
           <motion.div {...fadeUp(0.15)} className="mx-auto max-w-lg">
@@ -219,7 +240,7 @@ export default function Home() {
                   {isLoading ? 'Setting up notifications...' : 'Allow Notifications'}
                 </button>
                 <p className="px-3 pt-3 text-center text-xs text-muted-foreground">
-                  Final step to activate your benefits and receive real-time admission alerts.
+                  Final step to activate discount support and receive real-time fee update alerts.
                 </p>
               </div>
             ) : (
@@ -227,7 +248,7 @@ export default function Home() {
                 href="/admission/start"
                 className="inline-flex w-full items-center justify-center rounded-full bg-foreground px-8 py-3 font-semibold text-background transition hover:scale-[1.02]"
               >
-                Get Admission Benefits
+                Get School Fee Discount Support
               </Link>
             )}
           </motion.div>
@@ -237,25 +258,27 @@ export default function Home() {
       <section className="border-t border-border/30 px-4 py-20 md:py-28">
         <motion.div {...fadeUp(0)} className="mx-auto max-w-5xl text-center">
           <h2 className="text-3xl md:text-5xl">
-            Admission process has <span className="font-serif italic">changed.</span> Are you ready?
+            School fee discounts are possible. <span className="font-serif italic">Let us help you get them.</span>
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-muted-foreground">
-            We help families move from uncertainty to confirmed admissions with clear steps and
-            school-facing lead tracking.
+            School admissions made smarter: we help you secure the best possible fee discounts.
+          </p>
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
+            For parents changing schools: we help with new admission and fee discount support.
           </p>
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {[
               {
                 title: 'Step 1: Register',
-                desc: 'Share parent details and receive your lead ID instantly.',
+                desc: 'You focus on your child\'s future, we focus on negotiating better school fee discounts.',
               },
               {
                 title: 'Step 2: Child Profile',
-                desc: 'Add each child class/school details to improve matching.',
+                desc: 'Your child\'s admission, your advantage - we work with schools to unlock fee discounts for you.',
               },
               {
                 title: 'Step 3: Preferences',
-                desc: 'Set school choices, budget and transport needs.',
+                desc: 'Better admissions start here: expert support to negotiate school fee discounts for parents.',
               },
             ].map((item, index) => (
               <motion.div

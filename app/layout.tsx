@@ -3,8 +3,10 @@ import './globals.css'
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://bcei.vercel.app'),
+  applicationName: 'Any School Fee Discount',
   title: 'Any School Fee Discount',
   description: 'Get notified about the latest school fee discount updates',
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: '/favicon.png',
     shortcut: '/favicon.png',

@@ -6,8 +6,8 @@ import { AdmissionStepLayout } from '@/components/admission/AdmissionStepLayout'
 export default function AdmissionStartPage() {
   return (
     <AdmissionStepLayout
-      title="Get Admission Benefits for Top Schools in Karimnagar"
-      subtitle="A short 3-step form helps us match your child with participating schools."
+      title="Get the best possible school fee discount for your child"
+      subtitle="School admissions made smarter: we help you secure the best possible fee discounts."
       stepLabel="Step 1/5"
       backHref="/"
       backLabel="Home"
@@ -22,11 +22,13 @@ export default function AdmissionStartPage() {
     >
       <div className="space-y-4 rounded-lg border border-white/10 bg-white/5 p-5 text-sm text-white/80">
         <p>
-          Schools share admission benefits only with eligible families. Complete this guided flow to
-          unlock updates and support.
+          You focus on your child&apos;s future, we focus on negotiating better school fee discounts.
         </p>
         <p>
-          You will receive a unique Lead ID that you can show during admission discussions.
+          Complete this guided flow and our team starts school-side coordination for discount support.
+        </p>
+        <p>
+          New school admission support for transfer families - with discount-focused guidance.
         </p>
       </div>
     </AdmissionStepLayout>

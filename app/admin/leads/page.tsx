@@ -92,7 +92,14 @@ function AdminLeadsContent() {
     <main className="min-h-screen bg-black p-4 text-white">
       <div className="mx-auto flex w-full max-w-4xl flex-col space-y-6">
         <div className="mx-auto h-20 w-20 overflow-hidden rounded-full bg-white ring-2 ring-white/20">
-          <Image src="/logo.png" alt="Any School Fee Discount Logo" width={80} height={80} unoptimized />
+          <Image
+            src="/logo.png"
+            alt="Any School Fee Discount Logo"
+            width={80}
+            height={80}
+            className="h-full w-full object-cover"
+            unoptimized
+          />
         </div>
 
         <div className="flex items-center justify-between">

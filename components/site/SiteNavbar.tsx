@@ -7,7 +7,7 @@ const navItems = [
   { label: 'Home', href: '/' },
   { label: 'How It Works', href: '/admission/start' },
   { label: 'Benefits', href: '/admission/benefits' },
-  { label: 'Contact', href: '/admin' },
+  { label: 'Contact', href: '/contact' },
 ]
 
 export function SiteNavbar() {

@@ -13,7 +13,7 @@ export default function AdmissionBenefitsPage() {
   return (
     <AdmissionStepLayout
       title="Admission Benefit Journey"
-      subtitle="Follow these stages to activate and use your eligible school benefits."
+      subtitle="Your child&apos;s admission, your advantage - we work with schools to unlock fee discounts for you."
       stepLabel="Step 2/5"
       backHref="/admission/start"
       cta={
@@ -39,6 +39,10 @@ export default function AdmissionBenefitsPage() {
 
         <div className="rounded-lg border border-white/20 bg-white/5 p-4">
           <p className="text-xs leading-relaxed text-white/85">
+            Better admissions start here: expert support to negotiate school fee discounts for parents.
+            {' '}
+            Switch your child to a better school with expert admission help and fee discount support.
+            {' '}
             We do not guarantee or promise fixed discounts. We assist parents in accessing
             admission benefits offered by participating schools. Benefits are subject to school
             participation, seat availability, admission policies, and eligibility criteria,

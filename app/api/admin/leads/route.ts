@@ -69,9 +69,11 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching leads:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch leads. Please try again.' },
-      { status: 500 }
-    )
+    // Avoid hard-failing admin UI on transient DB/auth/network issues.
+    return NextResponse.json({
+      success: false,
+      message: 'Leads are temporarily unavailable. Please retry in a few seconds.',
+      leads: [],
+    })
   }
 }
