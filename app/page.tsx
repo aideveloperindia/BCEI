@@ -154,13 +154,13 @@ export default function Home() {
       <ServiceWorkerRegistration />
       <div className="flex flex-col items-center justify-center space-y-8 max-w-md w-full">
         {/* Logo - light circle so dark logo is visible on black background */}
-        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white flex items-center justify-center p-3 shadow-lg ring-2 ring-white/20">
+        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-lg ring-2 ring-white/20">
           <Image
             src="/logo.png"
             alt="Any School Fee Discount Logo"
             width={160}
             height={160}
-            className="object-contain w-full h-full"
+            className="object-cover w-full h-full"
             priority
             unoptimized
           />

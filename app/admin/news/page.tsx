@@ -132,13 +132,13 @@ function NewsContent() {
   return (
     <main className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
       <div className="flex flex-col items-center justify-center space-y-8 max-w-2xl w-full">
-        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center p-2 shadow-lg ring-2 ring-white/20">
+        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-lg ring-2 ring-white/20">
           <Image
             src="/logo.png"
             alt="Any School Fee Discount Logo"
             width={96}
             height={96}
-            className="object-contain w-full h-full"
+            className="object-cover w-full h-full"
             priority
             unoptimized
           />
