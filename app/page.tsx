@@ -312,10 +312,10 @@ export default function Home() {
               Start
             </Link>
             <Link href="/admin" className="hover:text-foreground">
-              School Admin Dashboard
+              Admin
             </Link>
             <Link href="/school-admin" className="hover:text-foreground">
-              School Portal
+              School Admin
             </Link>
           </div>
         </div>
